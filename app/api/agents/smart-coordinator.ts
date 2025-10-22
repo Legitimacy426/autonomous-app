@@ -17,6 +17,27 @@ interface ProcessResult {
 }
 
 /**
+ * Intent metadata for efficient routing
+ */
+interface IntentMetadata {
+  needsDbContext: boolean;
+  requiresExecution: boolean;
+}
+
+/**
+ * Configuration for each intent type
+ * This allows us to optimize resource usage based on intent
+ */
+const INTENT_CONFIG: Record<string, IntentMetadata> = {
+  "GREETING": { needsDbContext: false, requiresExecution: false },
+  "SIMPLE_QUESTION": { needsDbContext: false, requiresExecution: false },
+  "CRUD_OPERATION": { needsDbContext: true, requiresExecution: true },
+  "COMPLEX_WORKFLOW": { needsDbContext: true, requiresExecution: true },
+  "SAFETY_VIOLATION": { needsDbContext: false, requiresExecution: false },
+  "UNKNOWN": { needsDbContext: false, requiresExecution: false }
+};
+
+/**
  * Smart coordinator that intelligently routes requests based on complexity
  * Avoids unnecessary multi-agent workflows for simple requests
  */
@@ -43,9 +64,11 @@ export class SmartCoordinator {
 
   /**
    * Process task with intelligent routing
+   * Uses lazy context loading for efficiency
    */
   async processTask(input: string): Promise<ProcessResult> {
     console.log("🧠 Smart Coordinator: Processing task:", input);
+    const startTime = Date.now();
     
     try {
       // Step 1: Classify the input
@@ -53,27 +76,58 @@ export class SmartCoordinator {
       const classification = await this.classifier.classify(input);
       console.log("📋 Classification result:", classification);
 
-      // Step 2: Route based on classification - using AI intelligence, not hardcoded logic
+      // Step 2: Lazy context loading - only fetch DB context if needed
+      const intentConfig = INTENT_CONFIG[classification.intent as string] || INTENT_CONFIG["UNKNOWN"];
+      
+      let dbContext: Record<string, unknown> = {};
+      if (intentConfig.needsDbContext) {
+        console.log("📊 Fetching database context (required for this intent)...");
+        dbContext = await this.getDbContext();
+      } else {
+        console.log("⏭️ Skipping database context (not needed for this intent)");
+        // Provide minimal context for AI
+        dbContext = {
+          availableEntities: this.crudHandler.getAvailableEntityTypes(),
+          entityCounts: {},
+          totalEntities: 0,
+          availableOperations: ["create", "read", "update", "delete", "list"]
+        };
+      }
+
+      // Step 3: Route based on classification - using AI intelligence, not hardcoded logic
+      let result: ProcessResult;
       switch (classification.intent) {
         case "GREETING":
-          return await this.handleWithIntelligence(input, classification, "greeting");
+          result = await this.handleWithIntelligence(input, classification, "greeting", dbContext);
+          break;
 
         case "SIMPLE_QUESTION":
-          return await this.handleWithIntelligence(input, classification, "question");
+          result = await this.handleWithIntelligence(input, classification, "question", dbContext);
+          break;
 
         case "CRUD_OPERATION":
-          return await this.handleCrudOperation(input, classification);
+          result = await this.handleCrudOperation(input, classification);
+          break;
 
         case "SAFETY_VIOLATION":
-          return await this.handleWithIntelligence(input, classification, "safety");
+          result = await this.handleWithIntelligence(input, classification, "safety", dbContext);
+          break;
 
         case "COMPLEX_WORKFLOW":
-          return await this.handleComplexWorkflow(input);
+          result = await this.handleComplexWorkflow(input);
+          break;
 
         case "UNKNOWN":
         default:
-          return await this.handleWithIntelligence(input, classification, "unknown");
+          result = await this.handleWithIntelligence(input, classification, "unknown", dbContext);
+          break;
       }
+      
+      // Log performance metrics
+      const totalTime = Date.now() - startTime;
+      console.log(`⏱️ Total processing time: ${totalTime}ms`);
+      
+      return result;
     } catch (error) {
       console.error("❌ Smart Coordinator Error:", error);
       return {
@@ -88,18 +142,17 @@ export class SmartCoordinator {
 
   /**
    * Handle requests with true AI intelligence - no hardcoded if/else logic
+   * Now accepts dbContext as parameter for lazy loading
    */
   private async handleWithIntelligence(
     input: string, 
     classification: Record<string, unknown>,
-    context: "greeting" | "question" | "safety" | "unknown"
+    context: "greeting" | "question" | "safety" | "unknown",
+    dbContext: Record<string, unknown>
   ): Promise<ProcessResult> {
     console.log(`🤖 Using AI intelligence to handle ${context}:`, input);
     
     try {
-      // Get the database state for context-aware responses
-      const dbContext = await this.getDbContext();
-      
       // Let the AI generate an intelligent, context-aware response
       const response = await this.intelligentResponder.generateResponse(
         input,
