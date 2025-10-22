@@ -1,5 +1,5 @@
 import { ConvexHttpClient } from "convex/browser";
-import type { FunctionReference } from "convex/server";
+import { api } from "@/convex/_generated/api";
 import { PromptClassifier } from "./prompt-classifier";
 import { DynamicCrudHandler } from "./dynamic-crud-handler";
 import { PlannerAgent } from "./planner-agent";
@@ -252,9 +252,8 @@ export class SmartCoordinator {
   private async getDbContext(): Promise<Record<string, unknown>> {
     try {
       // Get current database state to provide context-aware responses
-      const queryRef = { name: "functions/users:listUsers" } as unknown as FunctionReference<"query">;
       const users = await this.convex.query(
-        queryRef,
+        api.functions.users.listUsers,
         {}
       );
       
