@@ -1,379 +1,659 @@
-import { BaseAgent } from "./base-agent";
-import { api } from "@/convex/_generated/api";
-import { ConvexHttpClient } from "convex/browser";
-
 /**
- * ComplexExecutor that actually executes database operations for multi-step workflows
+ * ComplexExecutor - Truly Dynamic AI-Powered Execution Engine
+ * 
+ * ARCHITECTURE PRINCIPLES:
+ * - NO hardcoded pattern matching (no if(input.includes(...)))
+ * - NO entity-specific logic (works with ANY entity type)
+ * - NO direct Convex API calls (uses DynamicCrudHandler only)
+ * - AI reasoning determines operations and sequences
+ * - All operations actually executed (no simulations)
+ * 
+ * FLOW:
+ * 1. AI analyzes request and creates execution plan
+ * 2. Plan steps executed dynamically via DynamicCrudHandler
+ * 3. Conditional logic handled based on runtime results
+ * 4. Works with any configured entity type
  */
+
+import { BaseAgent } from "./base-agent";
+import { ConvexHttpClient } from "convex/browser";
+import { DynamicCrudHandler } from "./dynamic-crud-handler";
+
+// ============= TYPE DEFINITIONS =============
+
+type OperationType = "create" | "read" | "update" | "delete" | "list";
+
+interface PlanCondition {
+  type: "count_gt" | "count_gte" | "count_lt" | "count_lte" | "count_eq" | "exists" | "not_exists";
+  fromStep: string;
+  field?: "count" | "items.length";
+  value?: number;
+}
+
+interface ExecutionPlanStep {
+  id: string;
+  purpose?: string;
+  operation: OperationType;
+  entityType: string;
+  data?: Record<string, unknown>;
+  identifier?: string;
+  filter?: Record<string, unknown>;
+  sort?: { by: string; order: "asc" | "desc" };
+  limit?: number;
+  condition?: PlanCondition;
+  repeat?: number;
+  fromStep?: string;
+  dataTemplate?: Record<string, unknown>;
+}
+
+interface ExecutionPlan {
+  steps: ExecutionPlanStep[];
+}
+
+interface StepResult {
+  stepId: string;
+  success: boolean;
+  operation: string;
+  entityType: string;
+  items?: unknown[];
+  count?: number;
+  ids?: string[];
+  details?: string;
+  meta?: Record<string, unknown>;
+  error?: string;
+}
+
+// ============= COMPLEX EXECUTOR =============
+
 export class ComplexExecutor extends BaseAgent {
+  private dynamicCrudHandler: DynamicCrudHandler;
+  private reasoning: string[] = [];
+
   constructor(convex: ConvexHttpClient) {
     super(
       convex,
-      `You are an advanced executor that performs complex database operations with actual execution capabilities.
+      `You are an advanced AI executor that creates execution plans for complex database workflows.
 
-CRITICAL: When asked to analyze requests, you MUST respond with ONLY valid JSON. No explanations, no markdown formatting, no additional text - just pure JSON.
+Your role is to analyze requests and generate STRUCTURED EXECUTION PLANS that will be executed by a dynamic handler.
 
-Your role is to:
-1. Break down complex requests into executable steps
-2. Actually execute database operations in sequence
-3. Handle conditional logic and branching
-4. Manage context and memory between operations
-5. Provide detailed reasoning and reflection
-6. Handle errors gracefully and provide alternatives
+You have access to these operations on ANY entity type:
+- list: Get all entities (supports filtering, sorting, limits)
+- create: Create new entities
+- read: Get specific entity by identifier
+- update: Update entity data
+- delete: Delete entities
 
-You have access to database operations for ANY entity type (users, products, orders, etc.):
-- create(entityType, data) - Create new entities
-- get(entityType, identifier) - Retrieve entities
-- delete(entityType, identifier) - Delete entities
-- list(entityType) - List all entities of a type
-- update(entityType, identifier, updates) - Update entity data
+You can reference previous steps using their IDs to create conditional logic.
 
-For complex workflows, you should:
-1. Analyze the request and identify which entity types are involved
-2. Break down the request into executable steps
-3. Execute each step with actual database calls on the appropriate entity type
-4. Use results from previous steps to inform next steps
-5. Handle errors and edge cases gracefully
-6. Provide comprehensive reasoning throughout
-7. Adapt to any entity type dynamically
-
-Always execute actual operations and provide real results. The system is entity-agnostic.`
+IMPORTANT: Respond with ONLY valid JSON. No markdown, no explanations - just JSON.`
     );
+    this.dynamicCrudHandler = new DynamicCrudHandler(convex);
   }
 
+  // ============= PUBLIC METHODS =============
+
   /**
-   * Execute complex workflows with actual database operations
+   * Process complex workflow using AI planning and dynamic execution
    */
-  async process(input: string) {
-    const reasoning: string[] = [];
+  async process(input: string): Promise<{ result: string; reasoning: string[] }> {
+    this.reasoning = [];
     let result = "";
 
     try {
-      reasoning.push("🔄 Starting complex workflow execution");
+      this.reasoning.push("🔄 Starting dynamic workflow execution");
       console.log("🔄 ComplexExecutor processing:", input);
 
-      // Step 1: Analyze and plan
-      reasoning.push("📋 Analyzing request and creating execution plan");
-      const analysisResult = await this.analyzeRequest(input);
-      reasoning.push(`📊 Analysis: ${analysisResult.summary}`);
+      // Step 1: Create execution plan using AI
+      this.reasoning.push("📋 Generating AI execution plan");
+      const plan = await this.createExecutionPlan(input);
+      this.reasoning.push(`📊 Plan created with ${plan.steps.length} steps`);
 
-      // Step 2: Execute the planned operations
-      reasoning.push("⚡ Executing planned operations");
-      const executionResults = await this.executeWorkflow(analysisResult, input);
-      
-      // Step 3: Format comprehensive results
-      result = this.formatComplexResult(executionResults, reasoning);
+      // Step 2: Execute plan dynamically
+      this.reasoning.push("⚡ Executing plan steps");
+      const stepResults = await this.executePlan(plan);
 
-      reasoning.push("✅ Complex workflow completed successfully");
-      await this.logAction(input, reasoning, result);
+      // Step 3: Format results
+      result = this.formatComplexResult(stepResults);
+      this.reasoning.push("✅ Workflow completed successfully");
 
-      return { result, reasoning };
+      await this.logAction(input, this.reasoning, result);
+      return { result, reasoning: this.reasoning };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      reasoning.push(`❌ Error in complex workflow: ${errorMessage}`);
-      result = `Complex workflow failed: ${errorMessage}`;
+      this.reasoning.push(`❌ Error: ${errorMessage}`);
+      result = `Workflow failed: ${errorMessage}`;
 
-      await this.logAction(input, reasoning, result, errorMessage);
-      return { result, reasoning };
+      await this.logAction(input, this.reasoning, result, errorMessage);
+      return { result, reasoning: this.reasoning };
     }
   }
 
-  /**
-   * Analyze the request and determine execution strategy
-   */
-  private async analyzeRequest(input: string): Promise<{
-    type: string;
-    steps: string[];
-    summary: string;
-  }> {
-    const analysisPrompt = `
-Analyze this complex request and break it down into executable steps:
+  // ============= AI PLANNING =============
 
+  /**
+   * Create execution plan using AI reasoning
+   */
+  private async createExecutionPlan(input: string): Promise<ExecutionPlan> {
+    const availableEntities = this.dynamicCrudHandler.getAvailableEntityTypes();
+    
+    const planningPrompt = `
+Create an execution plan for this request:
 "${input}"
 
-Determine:
-1. What type of workflow this is (conditional, multi-step, bulk, analysis, etc.)
-2. What specific database operations need to be performed
-3. In what order they should be executed
-4. Any conditional logic or branching needed
+Available entity types: ${availableEntities.join(", ")}
 
-IMPORTANT: You MUST respond with ONLY valid JSON, nothing else. No explanations, no markdown, just pure JSON.
+Generate a plan with steps that:
+1. Use operations: list, create, read, update, delete
+2. Work with the entity types mentioned in the request
+3. Handle conditions using fromStep references
+4. Support sorting (sort: {by: "field", order: "asc"|"desc"})
+5. Support limits (limit: number)
 
-Return this exact JSON structure:
+Respond with ONLY valid JSON matching this structure:
 {
-  "type": "workflow type",
-  "steps": ["step 1", "step 2", "step 3"],
-  "summary": "brief summary of what will be done"
-}`;
+  "steps": [
+    {
+      "id": "step1",
+      "purpose": "Why this step",
+      "operation": "list",
+      "entityType": "users",
+      "sort": {"by": "_creationTime", "order": "asc"},
+      "limit": 1
+    },
+    {
+      "id": "step2",
+      "purpose": "Conditional action",
+      "operation": "delete",
+      "entityType": "users",
+      "condition": {"type": "count_gt", "fromStep": "step1", "field": "count", "value": 3},
+      "fromStep": "step1"
+    },
+    {
+      "id": "step3",
+      "purpose": "Alternative action",
+      "operation": "create",
+      "entityType": "users",
+      "condition": {"type": "count_lte", "fromStep": "step1", "field": "count", "value": 3},
+      "data": {"name": "TempUser", "email": "temp@demo.com"}
+    }
+  ]
+}
+
+IMPORTANT: Return ONLY the JSON, no markdown formatting.`;
 
     try {
-      const response = await this.execute(analysisPrompt);
+      const response = await this.execute(planningPrompt);
+      const plan = this.parseJSON<ExecutionPlan>(response);
       
-      // Try to extract JSON from response (handles markdown code blocks, etc.)
-      let cleaned = response.trim();
-      
-      // Remove markdown code blocks if present
-      cleaned = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      
-      // Try to find JSON object in the response
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleaned = jsonMatch[0];
+      // Validate plan
+      if (!plan.steps || !Array.isArray(plan.steps)) {
+        throw new Error("Invalid plan structure: missing steps array");
       }
-      
-      const parsed = JSON.parse(cleaned);
-      
-      // Validate the structure
-      if (!parsed.type || !parsed.steps || !parsed.summary) {
-        throw new Error("Invalid analysis structure");
+
+      for (const step of plan.steps) {
+        if (!step.id || !step.operation || !step.entityType) {
+          throw new Error(`Invalid step: ${JSON.stringify(step)}`);
+        }
+        if (!availableEntities.includes(step.entityType)) {
+          console.warn(`Entity type '${step.entityType}' not configured, using anyway`);
+        }
       }
-      
-      return parsed;
+
+      console.log("✅ Generated plan:", JSON.stringify(plan, null, 2));
+      return plan;
     } catch (error) {
-      console.error("Failed to parse analysis JSON:", error);
+      console.error("Failed to create execution plan:", error);
+      throw new Error(`Plan creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+
+  // ============= PLAN EXECUTION =============
+
+  /**
+   * Execute the plan by processing each step sequentially
+   */
+  private async executePlan(plan: ExecutionPlan): Promise<StepResult[]> {
+    const results: StepResult[] = [];
+    const resultMap: Record<string, StepResult> = {};
+
+    for (const step of plan.steps) {
+      try {
+        console.log(`💡 Executing step ${step.id}: ${step.operation} on ${step.entityType}`);
+        const stepResult = await this.executeDynamicOperation(step, resultMap);
+        results.push(stepResult);
+        resultMap[step.id] = stepResult;
+        
+        this.reasoning.push(`✅ ${step.id}: ${step.operation} ${step.entityType} - ${stepResult.success ? "success" : "failed"}`);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        const stepResult: StepResult = {
+          stepId: step.id,
+          success: false,
+          operation: step.operation,
+          entityType: step.entityType,
+          error: errorMessage
+        };
+        results.push(stepResult);
+        resultMap[step.id] = stepResult;
+        
+        this.reasoning.push(`❌ ${step.id}: ${errorMessage}`);
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Execute a single step dynamically
+   */
+  private async executeDynamicOperation(
+    step: ExecutionPlanStep,
+    priorResults: Record<string, StepResult>
+  ): Promise<StepResult> {
+    // Check condition if present
+    if (step.condition) {
+      const conditionMet = this.evaluateCondition(step.condition, priorResults);
+      if (!conditionMet) {
+        console.log(`⏭️ Skipping ${step.id} - condition not met`);
+        return {
+          stepId: step.id,
+          success: true,
+          operation: step.operation,
+          entityType: step.entityType,
+          count: 0,
+          meta: { skipped: true },
+          details: "Skipped due to condition"
+        };
+      }
+    }
+
+    // Handle fromStep (operate on items from previous step)
+    if (step.fromStep) {
+      return await this.executeOnPriorStepItems(step, priorResults);
+    }
+
+    // Handle repeat
+    if (step.repeat && step.repeat > 1) {
+      return await this.executeRepeated(step, step.repeat);
+    }
+
+    // Single operation
+    return await this.executeSingleOperation(step);
+  }
+
+  // ============= HELPER METHODS =============
+
+  /**
+   * Execute a single CRUD operation
+   */
+  private async executeSingleOperation(step: ExecutionPlanStep): Promise<StepResult> {
+    const operation = step.operation.toUpperCase() as "CREATE" | "READ" | "UPDATE" | "DELETE" | "LIST";
+    
+    // Build input string for CRUD handler
+    const inputParts: string[] = [];
+    if (step.data) {
+      for (const [key, value] of Object.entries(step.data)) {
+        inputParts.push(`${key}: ${value}`);
+      }
+    }
+    if (step.identifier) {
+      inputParts.push(`identifier: ${step.identifier}`);
+    }
+    const input = inputParts.join(", ") || `${operation} ${step.entityType}`;
+    
+    // Build entities array
+    const entities: Array<{ type: string; value: string }> = [];
+    if (step.data) {
+      for (const [key, value] of Object.entries(step.data)) {
+        entities.push({ type: key, value: String(value) });
+      }
+    }
+    if (step.identifier) {
+      const config = this.dynamicCrudHandler.getEntityConfig(step.entityType);
+      const identifierField = config?.identifierField || "email";
+      entities.push({ type: identifierField, value: step.identifier });
+    }
+
+    console.log(`👉 Calling CRUD handler: ${operation} on ${step.entityType}`);
+    const crudResult = await this.dynamicCrudHandler.handleCrudOperation(
+      operation,
+      step.entityType,
+      input,
+      entities
+    );
+
+    // Parse items from details string for list operations
+    let items: unknown[] = [];
+    let count = 0;
+    let ids: string[] = [];
+
+    if (operation === "LIST" && crudResult.success) {
+      // Extract items from the formatted list result
+      const lines = crudResult.details?.split("\n") || [];
+      const itemLines = lines.filter(line => line.trim().startsWith("-"));
+      count = itemLines.length;
       
-      // Fallback: Create a simple analysis based on the input
+      // Try to extract structured data
+      items = itemLines.map(line => {
+        const emailMatch = line.match(/\(([^)]+)\)/);
+        const nameMatch = line.match(/- (.+?) \(/);
+        return {
+          email: emailMatch ? emailMatch[1] : null,
+          name: nameMatch ? nameMatch[1] : null,
+          _raw: line
+        };
+      });
+      
+      // Apply sorting if specified
+      if (step.sort && items.length > 0) {
+        items = this.sortItems(items, step.sort);
+      }
+      
+      // Apply limit if specified
+      if (step.limit && items.length > step.limit) {
+        items = items.slice(0, step.limit);
+        count = items.length;
+      }
+      
+      ids = items.map(item => (item as { email?: string }).email || "").filter(Boolean);
+    } else if (operation === "CREATE" && crudResult.success) {
+      count = 1;
+      const emailMatch = crudResult.details?.match(/email:\s*([^\s,]+)/);
+      if (emailMatch) {
+        ids = [emailMatch[1]];
+      }
+    } else if (operation === "DELETE" && crudResult.success) {
+      count = 1;
+    }
+
+    return {
+      stepId: step.id,
+      success: crudResult.success,
+      operation: step.operation,
+      entityType: step.entityType,
+      items,
+      count,
+      ids,
+      details: crudResult.details,
+      error: crudResult.error
+    };
+  }
+
+  /**
+   * Execute operation multiple times
+   */
+  private async executeRepeated(step: ExecutionPlanStep, times: number): Promise<StepResult> {
+    const results: StepResult[] = [];
+    
+    for (let i = 0; i < times; i++) {
+      const result = await this.executeSingleOperation(step);
+      results.push(result);
+    }
+
+    const allSuccessful = results.every(r => r.success);
+    const totalCount = results.reduce((sum, r) => sum + (r.count || 0), 0);
+    const allIds = results.flatMap(r => r.ids || []);
+
+    return {
+      stepId: step.id,
+      success: allSuccessful,
+      operation: step.operation,
+      entityType: step.entityType,
+      count: totalCount,
+      ids: allIds,
+      details: `Repeated ${times} times, ${totalCount} total operations`,
+      meta: { repeated: times, results }
+    };
+  }
+
+  /**
+   * Execute operation on each item from a previous step
+   */
+  private async executeOnPriorStepItems(
+    step: ExecutionPlanStep,
+    priorResults: Record<string, StepResult>
+  ): Promise<StepResult> {
+    const priorStep = priorResults[step.fromStep!];
+    if (!priorStep || !priorStep.items || priorStep.items.length === 0) {
       return {
-        type: "conditional",
-        steps: [
-          "Analyze the conditional logic",
-          "Execute database operations based on conditions",
-          "Return results"
-        ],
-        summary: "Executing conditional workflow with fallback analysis"
+        stepId: step.id,
+        success: true,
+        operation: step.operation,
+        entityType: step.entityType,
+        count: 0,
+        details: "No items from prior step to process"
       };
     }
-  }
 
-  /**
-   * Execute the workflow with actual database operations
-   */
-  private async executeWorkflow(analysis: { type: string; steps: string[]; summary: string }, originalInput: string): Promise<{
-    steps: Array<{ step: string; result: string; success: boolean }>;
-    summary: string;
-  }> {
-    const executedSteps: Array<{ step: string; result: string; success: boolean }> = [];
+    const results: StepResult[] = [];
     
-    // Handle different workflow types
-    switch (analysis.type.toLowerCase()) {
-      case 'conditional':
-      case 'reasoning':
-        return await this.executeConditionalWorkflow(originalInput, executedSteps);
-        
-      case 'multi-step':
-      case 'sequential':
-        return await this.executeMultiStepWorkflow(originalInput, executedSteps);
-        
-      case 'bulk':
-      case 'chained':
-        return await this.executeBulkWorkflow(originalInput, executedSteps);
-        
-      case 'analysis':
-      case 'meta':
-        return await this.executeAnalysisWorkflow(originalInput, executedSteps);
-        
-      default:
-        return await this.executeGenericWorkflow(originalInput, executedSteps);
-    }
-  }
-
-  /**
-   * Handle conditional workflows (T3, T7)
-   */
-  private async executeConditionalWorkflow(input: string, steps: Array<{ step: string; result: string; success: boolean }>): Promise<{
-    steps: Array<{ step: string; result: string; success: boolean }>;
-    summary: string;
-  }> {
-    console.log("🔀 Executing conditional workflow");
-    
-    // Extract email from input
-    const emailMatch = input.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-    const email = emailMatch ? emailMatch[0] : null;
-    
-    if (input.includes("If there's already a user")) {
-      // T3: Check if user exists, then delete or create
-      console.log("🔍 Checking if user exists:", email);
-      const checkResult = await this.convex.query(api.functions.users.getUser, { email: email! });
-      steps.push({ step: "Check user existence", result: checkResult, success: !checkResult.includes("❌") });
+    for (const item of priorStep.items) {
+      // Apply data template if present
+      const itemData = step.dataTemplate 
+        ? this.applyDataTemplate(step.dataTemplate, item as Record<string, unknown>)
+        : step.data;
       
-      if (checkResult.includes("❌")) {
-        // User doesn't exist, create them
-        console.log("➕ User doesn't exist, creating Bob Marley");
-        const createResult = await this.convex.mutation(api.functions.users.createUser, {
-          name: "Bob Marley",
-          email: email!
+      const itemStep: ExecutionPlanStep = {
+        ...step,
+        data: itemData,
+        identifier: (item as { email?: string }).email || step.identifier
+      };
+
+      const result = await this.executeSingleOperation(itemStep);
+      results.push(result);
+    }
+
+    const allSuccessful = results.every(r => r.success);
+    const totalCount = results.reduce((sum, r) => sum + (r.count || 0), 0);
+    const allIds = results.flatMap(r => r.ids || []);
+
+    return {
+      stepId: step.id,
+      success: allSuccessful,
+      operation: step.operation,
+      entityType: step.entityType,
+      count: totalCount,
+      ids: allIds,
+      details: `Processed ${priorStep.items.length} items from ${step.fromStep}`,
+      meta: { processedItems: priorStep.items.length, results }
+    };
+  }
+
+  /**
+   * Evaluate a condition against prior results
+   */
+  private evaluateCondition(
+    condition: PlanCondition,
+    priorResults: Record<string, StepResult>
+  ): boolean {
+    const priorStep = priorResults[condition.fromStep];
+    if (!priorStep) {
+      console.warn(`Condition references unknown step: ${condition.fromStep}`);
+      return false;
+    }
+
+    const field = condition.field || "count";
+    let actualValue = 0;
+
+    if (field === "count") {
+      actualValue = priorStep.count ?? priorStep.items?.length ?? 0;
+    } else if (field === "items.length") {
+      actualValue = priorStep.items?.length ?? 0;
+    }
+
+    const targetValue = condition.value ?? 0;
+
+    let result = false;
+    switch (condition.type) {
+      case "count_gt":
+        result = actualValue > targetValue;
+        break;
+      case "count_gte":
+        result = actualValue >= targetValue;
+        break;
+      case "count_lt":
+        result = actualValue < targetValue;
+        break;
+      case "count_lte":
+        result = actualValue <= targetValue;
+        break;
+      case "count_eq":
+        result = actualValue === targetValue;
+        break;
+      case "exists":
+        result = actualValue > 0;
+        break;
+      case "not_exists":
+        result = actualValue === 0;
+        break;
+    }
+
+    console.log(`🔍 Condition: ${condition.type} - ${actualValue} vs ${targetValue} = ${result}`);
+    return result;
+  }
+
+  /**
+   * Apply data template to an item
+   */
+  private applyDataTemplate(
+    template: Record<string, unknown>,
+    item: Record<string, unknown>
+  ): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(template)) {
+      if (typeof value === "string") {
+        // Handle {{item.field}} placeholders
+        let processed = value;
+        const itemPlaceholderRegex = /\{\{item\.([^}]+)\}\}/g;
+        processed = processed.replace(itemPlaceholderRegex, (_, field) => {
+          return String(item[field] ?? "");
         });
-        steps.push({ step: "Create user Bob Marley", result: createResult, success: !createResult.includes("❌") });
-      } else {
-        // User exists, delete them
-        console.log("🗑️ User exists, deleting");
-        const deleteResult = await this.convex.mutation(api.functions.users.deleteUser, { email: email! });
-        steps.push({ step: "Delete existing user", result: deleteResult, success: !deleteResult.includes("❌") });
-      }
-    } else if (input.includes("more than 3 users")) {
-      // T7: Check user count and branch
-      console.log("📊 Checking user count");
-      const listResult = await this.convex.query(api.functions.users.listUsers, {});
-      const userCount = listResult.includes("No users") ? 0 : (listResult.match(/- /g) || []).length;
-      steps.push({ step: `Check user count: ${userCount}`, result: listResult, success: true });
-      
-      if (userCount > 3) {
-        console.log("🗑️ More than 3 users, would delete oldest (simulated)");
-        steps.push({ step: "Delete oldest user (simulated)", result: "Would delete oldest user", success: true });
-      } else {
-        console.log("➕ 3 or fewer users, creating TempUser");
-        const createResult = await this.convex.mutation(api.functions.users.createUser, {
-          name: "TempUser",
-          email: "temp@demo.com"
+
+        // Handle {{ensureEmailDomain item.email "domain.com"}} transform
+        const emailDomainRegex = /\{\{ensureEmailDomain\s+item\.([^\s]+)\s+"([^"]+)"\}\}/g;
+        processed = processed.replace(emailDomainRegex, (_, field, domain) => {
+          const email = String(item[field] ?? "");
+          return this.ensureEmailDomain(email, domain);
         });
-        steps.push({ step: "Create TempUser", result: createResult, success: !createResult.includes("❌") });
+
+        result[key] = processed;
+      } else {
+        result[key] = value;
       }
     }
-    
-    return { steps, summary: "Conditional workflow executed with branching logic" };
+
+    return result;
   }
 
   /**
-   * Handle multi-step workflows (T4, T5)
+   * Ensure email has the correct domain
    */
-  private async executeMultiStepWorkflow(input: string, steps: Array<{ step: string; result: string; success: boolean }>): Promise<{
-    steps: Array<{ step: string; result: string; success: boolean }>;
-    summary: string;
-  }> {
-    console.log("📋 Executing multi-step workflow");
+  private ensureEmailDomain(email: string, domain: string): string {
+    if (!email) return `user@${domain}`;
     
-    if (input.includes("Create three users")) {
-      // T4: Create 3 users then list
-      const users = [
-        { name: "Alice", email: "alice@example.com" },
-        { name: "Bob", email: "bob@example.com" },
-        { name: "Charlie", email: "charlie@example.com" }
-      ];
-      
-      for (const user of users) {
-        console.log(`➕ Creating user: ${user.name}`);
-        const createResult = await this.convex.mutation(api.functions.users.createUser, user);
-        steps.push({ step: `Create ${user.name}`, result: createResult, success: !createResult.includes("❌") });
-      }
-      
-      console.log("📋 Listing all users to confirm");
-      const listResult = await this.convex.query(api.functions.users.listUsers, {});
-      steps.push({ step: "List all users", result: listResult, success: true });
-      
-    } else if (input.includes("Maria Lopez") && input.includes("update")) {
-      // T5: Create Maria then update her email
-      console.log("➕ Creating Maria Lopez");
-      const createResult = await this.convex.mutation(api.functions.users.createUser, {
-        name: "Maria Lopez",
-        email: "maria@demo.com"
-      });
-      steps.push({ step: "Create Maria Lopez", result: createResult, success: !createResult.includes("❌") });
-      
-      console.log("✏️ Updating Maria's email");
-      const updateResult = await this.convex.mutation(api.functions.users.updateUser, {
-        email: "maria@demo.com",
-        name: "Maria Lopez" // Keep name, just updating email would need different approach
-      });
-      steps.push({ step: "Update Maria's email", result: updateResult, success: !updateResult.includes("❌") });
+    const targetDomain = `@${domain}`;
+    if (email.endsWith(targetDomain)) {
+      return email;
+    }
+
+    // Replace existing domain or append
+    const atIndex = email.indexOf("@");
+    if (atIndex > 0) {
+      return email.substring(0, atIndex) + targetDomain;
     }
     
-    return { steps, summary: "Multi-step workflow executed sequentially" };
+    return email + targetDomain;
   }
 
   /**
-   * Handle bulk workflows (T8)
+   * Sort items by field
    */
-  private async executeBulkWorkflow(input: string, steps: Array<{ step: string; result: string; success: boolean }>): Promise<{
-    steps: Array<{ step: string; result: string; success: boolean }>;
-    summary: string;
-  }> {
-    console.log("🔄 Executing bulk workflow");
+  private sortItems(
+    items: unknown[],
+    sort: { by: string; order: "asc" | "desc" }
+  ): unknown[] {
+    return [...items].sort((a, b) => {
+      const aVal = (a as Record<string, unknown>)[sort.by];
+      const bVal = (b as Record<string, unknown>)[sort.by];
+      
+      if (aVal === bVal) return 0;
+      if (aVal === null || aVal === undefined) return 1;
+      if (bVal === null || bVal === undefined) return -1;
+      
+      // Type narrowing for comparison
+      const comparison = (aVal as string | number) < (bVal as string | number) ? -1 : 1;
+      return sort.order === "asc" ? comparison : -comparison;
+    });
+  }
+
+  /**
+   * Parse JSON with cleanup
+   */
+  private parseJSON<T>(response: string): T {
+    let cleaned = response.trim();
     
-    // T8: Find admin users and update their emails
-    console.log("📋 Listing all users to find Admin users");
-    const listResult = await this.convex.query(api.functions.users.listUsers, {});
-    steps.push({ step: "List all users", result: listResult, success: true });
+    // Remove markdown code blocks
+    cleaned = cleaned.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     
-    if (listResult.includes("Admin")) {
-      console.log("✏️ Found Admin users, updating emails (simulated)");
-      steps.push({ step: "Update Admin users emails", result: "Would update all Admin user emails to @company.com", success: true });
-    } else {
-      steps.push({ step: "No Admin users found", result: "No Admin users to update", success: true });
+    // Extract JSON object
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleaned = jsonMatch[0];
     }
     
-    return { steps, summary: "Bulk operation executed with filtering and updates" };
+    return JSON.parse(cleaned);
   }
 
   /**
-   * Handle analysis workflows (T10)
+   * Format execution results
    */
-  private async executeAnalysisWorkflow(input: string, steps: Array<{ step: string; result: string; success: boolean }>): Promise<{
-    steps: Array<{ step: string; result: string; success: boolean }>;
-    summary: string;
-  }> {
-    console.log("🔍 Executing analysis workflow");
+  private formatComplexResult(stepResults: StepResult[]): string {
+    let result = "🤖 **Dynamic Workflow Execution Results**\n\n";
     
-    // T10: Analyze users and clean up
-    console.log("📋 Listing all users for analysis");
-    const listResult = await this.convex.query(api.functions.users.listUsers, {});
-    steps.push({ step: "List users for analysis", result: listResult, success: true });
-    
-    console.log("🧹 Analyzing for duplicates and invalid entries");
-    steps.push({ step: "Analyze data quality", result: "Analyzed users for duplicates and invalid data", success: true });
-    steps.push({ step: "Cleanup summary", result: "Would remove duplicates and fix invalid entries if found", success: true });
-    
-    return { steps, summary: "Analysis and cleanup workflow executed" };
-  }
+    const successfulSteps = stepResults.filter(s => s.success && !s.meta?.skipped);
+    const skippedSteps = stepResults.filter(s => s.meta?.skipped);
+    const failedSteps = stepResults.filter(s => !s.success);
 
-  /**
-   * Handle generic workflows
-   */
-  private async executeGenericWorkflow(input: string, steps: Array<{ step: string; result: string; success: boolean }>): Promise<{
-    steps: Array<{ step: string; result: string; success: boolean }>;
-    summary: string;
-  }> {
-    // For T9 - reflection workflow
-    if (input.includes("Diana") && input.includes("explain")) {
-      console.log("➕ Creating Diana with reflection");
-      const createResult = await this.convex.mutation(api.functions.users.createUser, {
-        name: "Diana",
-        email: "diana@demo.com"
-      });
-      steps.push({ step: "Create Diana", result: createResult, success: !createResult.includes("❌") });
-      steps.push({ 
-        step: "Explanation", 
-        result: "I called the createUser function because you requested to create a user named Diana with email diana@demo.com. This is a standard user creation operation.", 
-        success: true 
-      });
-    }
-    
-    return { steps, summary: "Generic workflow executed with reasoning" };
-  }
-
-  /**
-   * Format comprehensive results
-   */
-  private formatComplexResult(executionResults: {
-    steps: Array<{ step: string; result: string; success: boolean }>;
-    summary: string;
-  }, reasoning: string[]): string {
-    let result = "🤖 **Complex Workflow Execution Results**\n\n";
-    
-    result += "📋 **Execution Summary:**\n";
-    result += `${executionResults.summary}\n\n`;
-    
     result += "⚡ **Steps Executed:**\n";
-    executionResults.steps.forEach((step, index: number) => {
-      const status = step.success ? "✅" : "❌";
-      result += `${index + 1}. ${status} ${step.step}\n`;
-      result += `   Result: ${step.result}\n\n`;
+    stepResults.forEach((step, index) => {
+      const status = step.meta?.skipped ? "⏭️" : (step.success ? "✅" : "❌");
+      result += `${index + 1}. ${status} ${step.stepId}: ${step.operation} ${step.entityType}\n`;
+      
+      if (step.meta?.skipped) {
+        result += `   Skipped - condition not met\n`;
+      } else if (step.count !== undefined) {
+        result += `   Count: ${step.count}\n`;
+      }
+      
+      if (step.details) {
+        const shortDetails = step.details.length > 100 
+          ? step.details.substring(0, 100) + "..."
+          : step.details;
+        result += `   Details: ${shortDetails}\n`;
+      }
+      
+      if (step.error) {
+        result += `   Error: ${step.error}\n`;
+      }
+      
+      result += "\n";
     });
-    
-    result += "🧠 **Reasoning Trail:**\n";
-    reasoning.forEach((reason, index) => {
-      result += `${index + 1}. ${reason}\n`;
-    });
-    
+
+    // Summary
+    result += "\n📊 **Summary:**\n";
+    result += `- ${successfulSteps.length} steps executed successfully\n`;
+    if (skippedSteps.length > 0) {
+      result += `- ${skippedSteps.length} steps skipped (conditions not met)\n`;
+    }
+    if (failedSteps.length > 0) {
+      result += `- ${failedSteps.length} steps failed\n`;
+    }
+
+    // Overall outcome
+    const totalOperations = successfulSteps.reduce((sum, s) => sum + (s.count || 0), 0);
+    result += `- Total operations: ${totalOperations}\n`;
+
     return result;
   }
 }
