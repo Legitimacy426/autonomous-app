@@ -226,21 +226,7 @@ export default function DemoPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
         <div className="container mx-auto p-4">
           <div className="max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="mb-6 text-center">
-              <div className="flex items-center justify-center gap-3 mb-3">
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl shadow-lg">
-                  <Sparkles className="h-8 w-8 text-white" />
-                </div>
-              </div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-                Autonomous AI Backend Demo
-              </h1>
-              <p className="text-gray-600 max-w-2xl mx-auto">
-                Experience natural language database management powered by LangChain agents and Convex.
-                Ask the AI to create, read, update, or delete users using plain English commands.
-              </p>
-            </div>
+           
 
             {/* Main Content */}
             <Tabs defaultValue="console" className="space-y-4">
