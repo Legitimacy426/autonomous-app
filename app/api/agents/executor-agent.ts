@@ -57,12 +57,29 @@ Always ensure your response is valid JSON and follows the schema exactly.`
       // First, analyze the input to determine the required action
       reasoning.push("Analyzing input to determine required action");
       const actionPlan = await this.execute(
-        `Analyze the following request and determine the appropriate database action: ${input}`
+        `Analyze the following request and determine the appropriate database action. Return ONLY a JSON object with an 'action' property set to one of: 'create', 'get', 'delete', 'list', or 'update'.
+
+Example response:
+{
+  "action": "create"
+}
+
+For the request: ${input}`
       );
       
-      // Parse the action plan
-      const plan = JSON.parse(actionPlan);
-      reasoning.push(`Planning to execute: ${plan.action}`);
+      // Parse the action plan, handling potential JSON formatting issues
+      let plan;
+      try {
+        // Remove any markdown formatting or extra text, keeping only the JSON object
+        const jsonStr = actionPlan.replace(/```json\n|\n```/g, '').trim();
+        plan = JSON.parse(jsonStr);
+        if (!plan.action) {
+          throw new Error("Invalid action plan format");
+        }
+        reasoning.push(`Planning to execute: ${plan.action}`);
+      } catch (error) {
+        throw new Error("Failed to parse action plan: Invalid JSON response");
+      }
 
       // Execute the appropriate database operation
       const executionResult = await this.executeOperation(plan, input);
@@ -242,26 +259,12 @@ Always ensure your response is valid JSON and follows the schema exactly.`
    * Format the execution result into a readable string
    */
   private formatResult(result: ExecutionResult): string {
-    let output = "🎯 Execution Result\n\n";
-
-    // Action taken
-    output += `📌 Action: ${result.action}\n\n`;
-
-    // Status
-    output += result.success
-      ? "✅ Status: Success\n"
-      : "❌ Status: Failed\n";
-
-    // Details
-    output += "\n📋 Details:\n";
-    output += result.details + "\n";
-
-    // Error (if any)
-    if (result.error) {
-      output += "\n⚠️ Error:\n";
-      output += result.error + "\n";
-    }
-
-    return output;
+    // Return JSON string representation of the execution result
+    return JSON.stringify({
+      success: result.success,
+      action: result.action,
+      details: result.details,
+      error: result.error
+    }, null, 2);
   }
 }
