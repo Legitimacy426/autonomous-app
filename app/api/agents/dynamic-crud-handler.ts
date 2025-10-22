@@ -467,6 +467,7 @@ Return empty object {} if no additional data found.`;
   /**
    * Implementation of abstract process method from BaseAgent
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async process(_input: string): Promise<{ result: string; reasoning: string[] }> {
     // This method is mainly for testing purposes
     // In practice, handleCrudOperation will be called directly

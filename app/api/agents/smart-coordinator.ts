@@ -1,10 +1,12 @@
 import { ConvexHttpClient } from "convex/browser";
+import type { FunctionReference } from "convex/server";
 import { PromptClassifier } from "./prompt-classifier";
 import { DynamicCrudHandler } from "./dynamic-crud-handler";
 import { PlannerAgent } from "./planner-agent";
 import { ResearcherAgent } from "./researcher-agent";
 import { ExecutorAgent } from "./executor-agent";
 import { ComplexExecutor } from "./complex-executor";
+import { IntelligentResponder } from "./intelligent-responder";
 
 interface ProcessResult {
   success: boolean;
@@ -19,20 +21,24 @@ interface ProcessResult {
  * Avoids unnecessary multi-agent workflows for simple requests
  */
 export class SmartCoordinator {
+  private convex: ConvexHttpClient;
   private classifier: PromptClassifier;
   private crudHandler: DynamicCrudHandler;
   private planner: PlannerAgent;
   private researcher: ResearcherAgent;
   private executor: ExecutorAgent;
   private complexExecutor: ComplexExecutor;
+  private intelligentResponder: IntelligentResponder;
 
   constructor(convex: ConvexHttpClient) {
+    this.convex = convex;
     this.classifier = new PromptClassifier(convex);
     this.crudHandler = new DynamicCrudHandler(convex);
     this.planner = new PlannerAgent(convex);
     this.researcher = new ResearcherAgent(convex);
     this.executor = new ExecutorAgent(convex);
     this.complexExecutor = new ComplexExecutor(convex);
+    this.intelligentResponder = new IntelligentResponder(convex);
   }
 
   /**
@@ -47,26 +53,26 @@ export class SmartCoordinator {
       const classification = await this.classifier.classify(input);
       console.log("📋 Classification result:", classification);
 
-      // Step 2: Route based on classification
+      // Step 2: Route based on classification - using AI intelligence, not hardcoded logic
       switch (classification.intent) {
         case "GREETING":
-          return this.handleGreeting(input);
+          return await this.handleWithIntelligence(input, classification, "greeting");
 
         case "SIMPLE_QUESTION":
-          return this.handleSimpleQuestion(input);
+          return await this.handleWithIntelligence(input, classification, "question");
 
         case "CRUD_OPERATION":
           return await this.handleCrudOperation(input, classification);
 
         case "SAFETY_VIOLATION":
-          return this.handleSafetyViolation(input);
+          return await this.handleWithIntelligence(input, classification, "safety");
 
         case "COMPLEX_WORKFLOW":
           return await this.handleComplexWorkflow(input);
 
         case "UNKNOWN":
         default:
-          return this.handleUnknown(input, classification);
+          return await this.handleWithIntelligence(input, classification, "unknown");
       }
     } catch (error) {
       console.error("❌ Smart Coordinator Error:", error);
@@ -81,53 +87,48 @@ export class SmartCoordinator {
   }
 
   /**
-   * Handle greeting requests directly
+   * Handle requests with true AI intelligence - no hardcoded if/else logic
    */
-  private handleGreeting(_input: string): ProcessResult {
-    console.log("👋 Handling greeting directly");
+  private async handleWithIntelligence(
+    input: string, 
+    classification: Record<string, unknown>,
+    context: "greeting" | "question" | "safety" | "unknown"
+  ): Promise<ProcessResult> {
+    console.log(`🤖 Using AI intelligence to handle ${context}:`, input);
     
-    const greetingResponses = [
-      "Hello! I'm your AI assistant. I can help you with database operations, answer questions, or handle complex tasks. What would you like me to do?",
-      "Hi there! I'm ready to help with CRUD operations, data management, or any other tasks you have in mind.",
-      "Greetings! I can assist with creating, reading, updating, or deleting data, as well as more complex workflows. How can I help you today?"
-    ];
-    
-    // Simple random selection
-    const response = greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
-    
-    return {
-      success: true,
-      result: response,
-      strategy: "DIRECT",
-      reasoning: ["Classified as greeting", "Handled with direct response"]
-    };
-  }
-
-  /**
-   * Handle simple questions directly
-   */
-  private handleSimpleQuestion(_input: string): ProcessResult {
-    console.log("❓ Handling simple question directly");
-    
-    // For simple questions, provide helpful information about capabilities
-    let response = "I'm an AI assistant that can help you with:\n\n";
-    response += "🗃️ **Database Operations:**\n";
-    response += "- Create, read, update, delete users\n";
-    response += "- List all users\n";
-    response += "- Handle complex multi-step workflows\n\n";
-    response += "🤖 **Smart Features:**\n";
-    response += "- Understand natural language requests\n";
-    response += "- Validate data automatically\n";
-    response += "- Handle conditional logic\n";
-    response += "- Extensible to other entity types\n\n";
-    response += "💡 Try asking me to create a user, list users, or perform complex operations!";
-    
-    return {
-      success: true,
-      result: response,
-      strategy: "DIRECT",
-      reasoning: ["Classified as simple question", "Provided capability overview"]
-    };
+    try {
+      // Get the database state for context-aware responses
+      const dbContext = await this.getDbContext();
+      
+      // Let the AI generate an intelligent, context-aware response
+      const response = await this.intelligentResponder.generateResponse(
+        input,
+        classification,
+        context,
+        dbContext
+      );
+      
+      return {
+        success: true,
+        result: response.message,
+        strategy: "DIRECT",
+        reasoning: [
+          `Classified as ${classification.intent}`,
+          "Generated intelligent response using AI reasoning",
+          ...response.reasoning
+        ]
+      };
+    } catch (error) {
+      console.error("Error in intelligent handling:", error);
+      // Fallback to a minimal intelligent response
+      const fallbackResponse = await this.intelligentResponder.generateFallbackResponse(input, context);
+      return {
+        success: true,
+        result: fallbackResponse,
+        strategy: "DIRECT",
+        reasoning: ["Used fallback intelligent response"]
+      };
+    }
   }
 
   /**
@@ -246,62 +247,32 @@ export class SmartCoordinator {
   }
 
   /**
-   * Handle safety violations
+   * Get database context for intelligent responses
    */
-  private handleSafetyViolation(_input: string): ProcessResult {
-    console.log("🚫 Blocking safety violation");
-    
-    const response = "⚠️ **Safety Notice**\n\n" +
-      "I cannot process requests that involve:\n" +
-      "- Destructive database operations (dropping tables, etc.)\n" +
-      "- System shutdown or server control\n" +
-      "- Potentially harmful actions\n\n" +
-      "Please rephrase your request to focus on safe database operations like creating, reading, updating, or deleting individual records.";
-
-    return {
-      success: false,
-      result: response,
-      strategy: "REJECTED",
-      reasoning: ["Classified as safety violation", "Request blocked for security"],
-      error: "Safety violation detected"
-    };
-  }
-
-  /**
-   * Handle unknown/unclear requests
-   */
-  private handleUnknown(_input: string, classification: Record<string, unknown>): ProcessResult {
-    console.log("❓ Handling unknown request");
-    
-    let response = "🤔 **I'm not sure how to help with that**\n\n";
-    response += "I can help you with:\n\n";
-    response += "**Simple Operations:**\n";
-    response += "- \"Create a user named John with email john@example.com\"\n";
-    response += "- \"Show me the user alice@demo.com\"\n";
-    response += "- \"List all users\"\n";
-    response += "- \"Delete user bob@example.com\"\n\n";
-    response += "**Complex Operations:**\n";
-    response += "- \"Create 3 users then list them all\"\n";
-    response += "- \"If there are more than 5 users, delete the oldest one\"\n";
-    response += "- \"Update all admin users to have company email addresses\"\n\n";
-    response += "Could you please rephrase your request?";
-    
-    const confidence = typeof classification.confidence === "number" ? classification.confidence : 0;
-    if (confidence < 0.5) {
-      response += `\n\n*Classification confidence was low (${Math.round(confidence * 100)}%), so I might have misunderstood your request.*`;
+  private async getDbContext(): Promise<Record<string, unknown>> {
+    try {
+      // Get current database state to provide context-aware responses
+      const queryRef = { name: "functions/users:listUsers" } as unknown as FunctionReference<"query">;
+      const users = await this.convex.query(
+        queryRef,
+        {}
+      );
+      
+      return {
+        hasUsers: !users.includes("No users"),
+        userCount: users.includes("No users") ? 0 : (users.match(/- /g) || []).length,
+        availableOperations: ["create", "read", "update", "delete", "list"],
+        availableEntities: this.crudHandler.getAvailableEntityTypes()
+      };
+    } catch (error) {
+      console.error("Error getting DB context:", error);
+      return {
+        hasUsers: false,
+        userCount: 0,
+        availableOperations: ["create", "read", "update", "delete", "list"],
+        availableEntities: ["users"]
+      };
     }
-
-    return {
-      success: false,
-      result: response,
-      strategy: "REJECTED",
-      reasoning: [
-        "Could not classify request clearly",
-        `Confidence: ${classification.confidence}`,
-        "Provided examples for user guidance"
-      ],
-      error: "Request unclear or unclassifiable"
-    };
   }
 
   /**

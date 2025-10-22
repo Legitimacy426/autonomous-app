@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:autonomous": "bun run test-autonomous-system.ts"
   },
   "dependencies": {
     "@auth/core": "0.37.0",
