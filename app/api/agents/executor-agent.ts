@@ -77,7 +77,7 @@ For the request: ${input}`
           throw new Error("Invalid action plan format");
         }
         reasoning.push(`Planning to execute: ${plan.action}`);
-      } catch (error) {
+      } catch (_error) {
         throw new Error("Failed to parse action plan: Invalid JSON response");
       }
 
