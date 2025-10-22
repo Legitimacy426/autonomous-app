@@ -14,12 +14,13 @@ import {
   User, 
   Loader2, 
   AlertCircle, 
-  CheckCircle,
   Database,
   Terminal,
   Sparkles,
-  Clock
+  Clock,
+  RefreshCw
 } from "lucide-react";
+import { useConversation } from "./conversation-provider";
 
 interface Message {
   id: string;
@@ -28,7 +29,7 @@ interface Message {
   timestamp: Date;
   reasoning?: Array<{
     action: string;
-    input: any;
+    input: Record<string, unknown>;
     observation: string;
   }>;
   error?: string;
@@ -39,6 +40,7 @@ interface AIInterfaceProps {
 }
 
 export function AIInterface({ className }: AIInterfaceProps) {
+  const { sessionId, resetSession } = useConversation();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -77,6 +79,18 @@ export function AIInterface({ className }: AIInterfaceProps) {
     });
   };
 
+  const handleResetSession = () => {
+    resetSession();
+    setMessages([
+      {
+        id: "welcome",
+        role: "system",
+        content: "🔄 Started a new conversation. How can I help you?",
+        timestamp: new Date(),
+      },
+    ]);
+  };
+
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -97,7 +111,7 @@ export function AIInterface({ className }: AIInterfaceProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: input }),
+        body: JSON.stringify({ text: input, sessionId }),
       });
 
       const data = await response.json();
@@ -150,16 +164,27 @@ export function AIInterface({ className }: AIInterfaceProps) {
     <div className={`flex flex-col h-full ${className}`}>
       <Card className="flex-1 flex flex-col shadow-xl border-2">
         <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/10 rounded-lg backdrop-blur">
-              <Sparkles className="h-6 w-6" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/10 rounded-lg backdrop-blur">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">AI Agent Console</CardTitle>
+                <CardDescription className="text-gray-100">
+                  Natural language database management powered by LangChain
+                </CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-2xl">AI Agent Console</CardTitle>
-              <CardDescription className="text-gray-100">
-                Natural language database management powered by LangChain
-              </CardDescription>
-            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20"
+              onClick={handleResetSession}
+              title="Start new conversation"
+            >
+              <RefreshCw className="h-5 w-5" />
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="flex-1 p-0 flex flex-col">

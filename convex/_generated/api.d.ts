@@ -9,6 +9,8 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as functions_aiAuditLogs from "../functions/aiAuditLogs.js";
+import type * as functions_conversationHistory from "../functions/conversationHistory.js";
 import type * as functions_users from "../functions/users.js";
 import type * as http from "../http.js";
 import type * as users from "../users.js";
@@ -29,6 +31,8 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  "functions/aiAuditLogs": typeof functions_aiAuditLogs;
+  "functions/conversationHistory": typeof functions_conversationHistory;
   "functions/users": typeof functions_users;
   http: typeof http;
   users: typeof users;

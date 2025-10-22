@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { AIInterface } from "@/components/ai/ai-interface";
 import ConvexClientProvider from "@/components/convex-client-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,12 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
-  Bot, 
   Database, 
   Users, 
   Terminal,
   RefreshCw,
-  Sparkles,
   Code2,
   Settings,
   Activity
@@ -21,16 +18,20 @@ import {
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
+interface User {
+  name: string;
+  email: string;
+}
+
 function UsersDashboard() {
   const users = useQuery(api.functions.users.listUsers);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+    // Convex automatically refreshes data
   };
 
   // Parse the users string response into structured data
-  const parseUsers = (usersString: string) => {
+  const parseUsers = (usersString: string): User[] => {
     if (!usersString || usersString.includes("No users found")) {
       return [];
     }
@@ -45,7 +46,7 @@ function UsersDashboard() {
         }
         return null;
       })
-      .filter(Boolean);
+      .filter((user): user is User => user !== null);
   };
 
   const usersList = users ? parseUsers(users) : [];
@@ -87,7 +88,7 @@ function UsersDashboard() {
               <div className="text-sm text-gray-600 mb-3">
                 Total users: <Badge variant="secondary">{usersList.length}</Badge>
               </div>
-              {usersList.map((user: any, idx: number) => (
+              {usersList.map((user, idx) => (
                 <div
                   key={idx}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -226,8 +227,6 @@ export default function DemoPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
         <div className="container mx-auto p-4">
           <div className="max-w-7xl mx-auto">
-           
-
             {/* Main Content */}
             <Tabs defaultValue="console" className="space-y-4">
               <TabsList className="grid w-full grid-cols-3 max-w-md mx-auto">
