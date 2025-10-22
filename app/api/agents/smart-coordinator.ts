@@ -4,6 +4,7 @@ import { DynamicCrudHandler } from "./dynamic-crud-handler";
 import { PlannerAgent } from "./planner-agent";
 import { ResearcherAgent } from "./researcher-agent";
 import { ExecutorAgent } from "./executor-agent";
+import { ComplexExecutor } from "./complex-executor";
 
 interface ProcessResult {
   success: boolean;
@@ -23,6 +24,7 @@ export class SmartCoordinator {
   private planner: PlannerAgent;
   private researcher: ResearcherAgent;
   private executor: ExecutorAgent;
+  private complexExecutor: ComplexExecutor;
 
   constructor(convex: ConvexHttpClient) {
     this.classifier = new PromptClassifier(convex);
@@ -30,6 +32,7 @@ export class SmartCoordinator {
     this.planner = new PlannerAgent(convex);
     this.researcher = new ResearcherAgent(convex);
     this.executor = new ExecutorAgent(convex);
+    this.complexExecutor = new ComplexExecutor(convex);
   }
 
   /**
@@ -202,84 +205,41 @@ export class SmartCoordinator {
   }
 
   /**
-   * Handle complex workflows using multi-agent system
+   * Handle complex workflows using advanced execution
    */
   private async handleComplexWorkflow(input: string): Promise<ProcessResult> {
-    console.log("🚀 Handling complex workflow with multi-agent system");
+    console.log("🚀 Handling complex workflow with advanced executor");
     
     try {
-      // Step 1: Create a plan
-      const planResult = await this.planner.process(input);
-      if (!planResult.result) {
-        return {
-          success: false,
-          result: "Failed to create execution plan",
-          strategy: "MULTI_AGENT",
-          reasoning: ["Multi-agent workflow failed at planning stage"],
-          error: "Planning failed"
-        };
-      }
-
-      // Step 2: Research current state
-      const researchResult = await this.researcher.process(input);
-      if (!researchResult.result) {
-        return {
-          success: false,
-          result: "Failed to complete research phase",
-          strategy: "MULTI_AGENT",
-          reasoning: ["Multi-agent workflow failed at research stage"],
-          error: "Research failed"
-        };
-      }
-
-      // Step 3: Execute with full context
-      const executionContext = `
-Task: ${input}
-
-Plan:
-${planResult.result}
-
-Research:
-${researchResult.result}
-
-Please execute the appropriate actions based on this information.`;
-
-      const executionResult = await this.executor.process(executionContext);
+      // Use ComplexExecutor for direct execution with reasoning
+      const executionResult = await this.complexExecutor.process(input);
+      
       if (!executionResult.result) {
         return {
           success: false,
-          result: "Failed to execute planned actions",
+          result: "Failed to execute complex workflow",
           strategy: "MULTI_AGENT",
-          reasoning: ["Multi-agent workflow failed at execution stage"],
+          reasoning: ["Complex workflow execution failed"],
           error: "Execution failed"
         };
       }
 
-      // Format comprehensive result
-      let formattedResult = "🤖 **Complex Workflow Results**\n\n";
-      formattedResult += "📋 **Planning Phase:**\n";
-      formattedResult += planResult.result + "\n\n";
-      formattedResult += "🔍 **Research Phase:**\n";
-      formattedResult += researchResult.result + "\n\n";
-      formattedResult += "⚡ **Execution Phase:**\n";
-      formattedResult += executionResult.result;
-
       return {
         success: true,
-        result: formattedResult,
+        result: executionResult.result,
         strategy: "MULTI_AGENT",
         reasoning: [
           "Classified as complex workflow",
-          "Used full multi-agent system (Planner → Researcher → Executor)",
-          "All phases completed successfully"
+          "Used ComplexExecutor with actual database operations",
+          ...executionResult.reasoning
         ]
       };
     } catch (error) {
       return {
         success: false,
         result: "Complex workflow processing failed",
-        strategy: "MULTI_AGENT",
-        reasoning: ["Error in multi-agent workflow"],
+        strategy: "MULTI_AGENT", 
+        reasoning: ["Error in complex workflow execution"],
         error: error instanceof Error ? error.message : "Unknown error"
       };
     }

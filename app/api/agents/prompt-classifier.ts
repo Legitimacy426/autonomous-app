@@ -77,12 +77,37 @@ Analyze this user input and classify it according to the guidelines:
 
 User Input: "${input}"
 
-Consider these patterns:
-- Greetings: "hello", "hi", "hey", etc.
-- Simple questions: "what is...", "how do...", etc.  
-- CRUD operations: "create user", "delete user", "list users", etc.
-- Complex workflows: multi-step operations, conditional logic, bulk operations
-- Safety violations: "drop tables", "delete all", "shutdown", destructive commands
+Classification Patterns:
+
+1. GREETING: "hello", "hi", "hey", "good morning"
+
+2. SIMPLE_QUESTION: "what is...", "how do...", "what can you do", "help me understand"
+
+3. CRUD_OPERATION (single database operations):
+   - "Create a user named John"  
+   - "Show me user alice@demo.com"
+   - "Delete user bob@example.com"
+   - "List all users"
+   - "Update user email"
+
+4. COMPLEX_WORKFLOW (requires multi-agent planning):
+   - Conditional logic: "If there are more than X users, then..."
+   - Multi-step: "Create 3 users then list them"
+   - Sequential with context: "Create user, then update their email"
+   - Bulk operations: "For every user that contains 'Admin'..."
+   - Analysis requests: "Analyze all users and clean up duplicates"
+   - Reasoning requests: "...then explain which function was called and why"
+
+5. SAFETY_VIOLATION: "drop tables", "delete all", "shutdown server", "destroy database"
+
+6. UNKNOWN: Unclear, ambiguous, or unrelated requests
+
+Key Decision Factors:
+- Single operation = CRUD_OPERATION
+- Multiple operations OR conditional logic OR "if/then" statements = COMPLEX_WORKFLOW  
+- Requests for explanation/reasoning = COMPLEX_WORKFLOW
+- Bulk operations on multiple records = COMPLEX_WORKFLOW
+- Analysis or cleanup requests = COMPLEX_WORKFLOW
 
 Respond with classification JSON only.`;
 

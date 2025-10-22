@@ -20,98 +20,93 @@ export class ExecutorAgent extends BaseAgent {
   constructor(convex: ConvexHttpClient) {
     super(
       convex,
-      `You are an executor agent that performs database operations.
-Your role is to:
-1. Execute database operations safely and efficiently
-2. Handle errors gracefully
-3. Validate inputs before execution
-4. Provide clear feedback on actions taken
+      `You are an advanced executor agent that performs complex database operations and reasoning tasks.
 
-Available tools:
+Your capabilities include:
+1. Execute database operations safely and efficiently
+2. Handle conditional logic (if/then statements)
+3. Perform multi-step operations with context memory
+4. Validate inputs and handle errors gracefully
+5. Provide detailed reasoning and reflection
+6. Perform bulk operations and analysis
+
+Available database tools:
 - createUser: Create a new user with name and email
-- getUser: Get user details by email
+- getUser: Get user details by email  
 - deleteUser: Delete a user by email
 - listUsers: List all users in the database
 - updateUser: Update user information (name, bio, location, website)
 
-Format your execution results as a JSON object with the following structure:
-{
-  "success": boolean,
-  "action": "Description of the action taken",
-  "details": "Detailed results of the operation",
-  "error": "Error message if any (optional)"
-}
+Complex Operations You Can Handle:
+- Conditional logic: Check conditions and branch accordingly
+- Sequential operations: Perform multiple steps with context
+- Bulk operations: Process multiple records
+- Analysis: Examine data and make decisions
+- Error recovery: Handle validation errors and provide alternatives
+- Reflection: Explain reasoning and decision-making process
 
-Always ensure your response is valid JSON and follows the schema exactly.`
+Always break down complex requests into logical steps:
+1. Understand the requirements
+2. Check current state if needed
+3. Execute operations in proper sequence
+4. Handle errors gracefully
+5. Provide comprehensive feedback including reasoning
+
+Format responses as detailed explanations with step-by-step execution details.`
     );
   }
 
   /**
-   * Execute a database operation based on the input
+   * Execute complex database operations with reasoning and context
    */
   async process(input: string) {
     const reasoning: string[] = [];
     let result = "";
 
     try {
-      console.log("🔄 Processing input:", input);
-      console.log("📝 Starting workflow...");
+      console.log("🔄 Processing complex workflow:", input);
+      reasoning.push("Starting complex workflow execution");
 
-      // First, analyze the input to determine the required action
-      reasoning.push("Analyzing input to determine required action");
-      console.log("🤔 Analyzing input to determine required action...");
-      console.log("🎯 Requesting action plan from LLM...");
-      const actionPlan = await this.execute(
-        `Analyze the following request and determine the appropriate database action. Return ONLY a JSON object with an 'action' property set to one of: 'create', 'get', 'delete', 'list', or 'update'.
+      // Use LLM to break down and execute the complex request
+      const executionPlan = await this.execute(`
+You need to execute this complex database request step by step:
 
-Example response:
-{
-  "action": "create"
-}
+"${input}"
 
-For the request: ${input}`
-      );
-      
-      // Parse the action plan, handling potential JSON formatting issues
-      let plan;
-      try {
-        console.log("📥 Received action plan:", actionPlan);
-        // Remove any markdown formatting or extra text, keeping only the JSON object
-        const jsonStr = actionPlan.replace(/```json\n|\n```/g, '').trim();
-        console.log("🔍 Cleaned JSON string:", jsonStr);
-        plan = JSON.parse(jsonStr);
-        if (!plan.action) {
-          throw new Error("Invalid action plan format");
-        }
-        reasoning.push(`Planning to execute: ${plan.action}`);
-        console.log("✅ Successfully parsed action plan:", plan);
-      } catch {
-        console.log("❌ Failed to parse action plan");
-        throw new Error("Failed to parse action plan: Invalid JSON response");
-      }
+Available database operations:
+- createUser(name, email) - Create a new user
+- getUser(email) - Get user by email  
+- deleteUser(email) - Delete user by email
+- listUsers() - List all users
+- updateUser(email, fields) - Update user information
 
-      // Execute the appropriate database operation
-      console.log("⚡ Executing operation:", plan.action);
-      const executionResult = await this.executeOperation(plan, input);
-      console.log("📊 Operation result:", executionResult);
-      
-      // Format the result
-      result = this.formatResult(executionResult);
+Your response should be a detailed execution plan with actual operations and reasoning.
+Include error handling, conditional logic, and step-by-step explanations.
 
-      // Log the successful execution
+Execute the operations and provide detailed results including:
+1. What you understood from the request
+2. Each step you executed and why
+3. The results of each operation
+4. Any errors encountered and how you handled them
+5. Final summary of what was accomplished
+
+Be comprehensive and include all your reasoning.`);
+
+      reasoning.push("Generated and executed comprehensive plan");
+      result = executionPlan;
+
+      // Log the execution
       await this.logAction(input, reasoning, result);
-      console.log("✨ Workflow completed successfully");
+      console.log("✨ Complex workflow completed");
 
       return { result, reasoning };
     } catch (error) {
-      console.log("❌ Workflow failed:", error);
+      console.log("❌ Complex workflow failed:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      reasoning.push(`Error during execution: ${errorMessage}`);
-      result = `Failed to execute operation: ${errorMessage}`;
+      reasoning.push(`Error during complex execution: ${errorMessage}`);
+      result = `Failed to execute complex workflow: ${errorMessage}`;
 
-      // Log the failed attempt
       await this.logAction(input, reasoning, result, errorMessage);
-
       return { result, reasoning };
     }
   }
