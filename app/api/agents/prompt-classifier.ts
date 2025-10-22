@@ -82,22 +82,25 @@ Classification Patterns:
 1. GREETING: "hello", "hi", "hey", "good morning"
 
 2. SIMPLE_QUESTION: 
-   - "what is...", "how do...", "what can you do", "help me understand"
+   - "what is [concept]", "how do [process]", "what can you do", "help me understand"
    - "how do I start", "how to create", "what's the process", "how should I"
    - "explain how", "tell me how", "show me how", "guide me"
    - Requests for instructions or guidance (not actual execution)
    - Generic questions about concepts, NOT data queries
+   - NEVER classify as SIMPLE_QUESTION if asking about specific entity data (e.g., "when did Adam register", "where is John")
 
 3. CRUD_OPERATION (single database operations with specific data on ANY entity type):
    - "Create a user named John with email john@example.com"  
-   - "Show me product SKU-123"
+   - "Show me product SKU-123" or "Get user Adam" or "Find order #456"
    - "Delete order #456"
    - "List all users" or "List all products" or "List all orders"
    - "How many users are there" or "How many products do we have" or "Count users"
    - "Show me all users" or "Get all products" or "Fetch orders"
-   - "What users exist" or "What products are in the database"
    - "Update product price to $29.99"
-   - ANY question asking for actual data from the database (use LIST operation)
+   - "What users exist" or "What products are in the database"
+   - "When did [person] register" or "Where is [user] located" or "What is [entity]'s [field]"
+   - "Get [entity]'s [field]" or "Show me [entity]'s data"
+   - ANY question asking for actual data from the database (use READ or LIST operation)
 
 4. COMPLEX_WORKFLOW (actual multi-step execution requests on ANY entity types):
    - Conditional logic: "If there are more than X users/products/orders, then..."
@@ -107,6 +110,8 @@ Classification Patterns:
    - Analysis requests: "Analyze all users and clean up duplicates" or "Review all products"
    - Cross-entity queries: "How many users registered on 20th bought from seller A" or "Show users who purchased product X"
    - Filtering/joining: "Users where X" combined with "products/orders where Y"
+   - Sorting/limiting queries: "List the newest user" or "Who was the first user" or "Show top 5 products" or "Get the oldest order"
+   - Superlatives: "first", "last", "newest", "oldest", "latest", "earliest", "top N"
 
 5. SAFETY_VIOLATION: "drop tables", "delete all", "shutdown server", "destroy database"
 
@@ -115,13 +120,19 @@ Classification Patterns:
 Key Decision Factors:
 - Asking "how to" or "how do I" = SIMPLE_QUESTION (instruction request)
 - Asking "how many", "what data", "show me", "list", "count" = CRUD_OPERATION (data query, use LIST)
+- Asking "when did [entity]", "where is [entity]", "what is [entity]'s [field]" = CRUD_OPERATION (use READ or LIST)
+- Superlatives (first, last, newest, oldest, latest, top N) = COMPLEX_WORKFLOW (requires sorting/limiting)
+- "Who was the first/newest/oldest" = COMPLEX_WORKFLOW (needs database query with sorting)
 - Single operation with specific data = CRUD_OPERATION
 - Multiple operations with specific data = COMPLEX_WORKFLOW  
 - Asking for guidance/instructions = SIMPLE_QUESTION
-- Requesting actual data from database = CRUD_OPERATION (LIST)
+- Requesting actual data from database = CRUD_OPERATION or COMPLEX_WORKFLOW (if sorting needed)
 - Requesting actual execution = CRUD_OPERATION or COMPLEX_WORKFLOW
 
-IMPORTANT: "How many users" or "What users exist" requires querying the database = CRUD_OPERATION with LIST operation!
+IMPORTANT: 
+- "How many users" or "What users exist" = CRUD_OPERATION with LIST operation
+- "When did Adam register" or "Where is John" = CRUD_OPERATION with READ operation (specific entity data)
+- "Who was the first user" or "newest product" = COMPLEX_WORKFLOW (requires sorting by _creationTime)
 
 Respond with classification JSON only.`;
 
