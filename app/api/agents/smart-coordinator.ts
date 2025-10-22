@@ -248,29 +248,87 @@ export class SmartCoordinator {
 
   /**
    * Get database context for intelligent responses
+   * Dynamically discovers all available entity types and their counts
    */
   private async getDbContext(): Promise<Record<string, unknown>> {
     try {
-      // Get current database state to provide context-aware responses
-      const users = await this.convex.query(
-        api.functions.users.listUsers,
-        {}
-      );
+      // Get all available entity types from the dynamic CRUD handler
+      const availableEntities = this.crudHandler.getAvailableEntityTypes();
       
+      // Dynamically gather counts for each entity type
+      const entityCounts: Record<string, number> = {};
+      const entityStatus: Record<string, boolean> = {};
+      
+      for (const entityType of availableEntities) {
+        try {
+          // Get entity configuration to find the list operation
+          const config = this.crudHandler.getEntityConfig(entityType);
+          if (config?.operations.list) {
+            // Try to get count by listing entities
+            const result = await this.executeOperation(config.operations.list, {});
+            
+            // Parse the result to get count (works with the format "Found X items")
+            const countMatch = result.match(/(\d+)/);
+            const count = countMatch ? parseInt(countMatch[1]) : 0;
+            
+            entityCounts[entityType] = count;
+            entityStatus[entityType] = count > 0;
+          }
+        } catch (error) {
+          // If we can't get count for this entity, just skip it
+          console.warn(`Could not get count for ${entityType}:`, error);
+          entityCounts[entityType] = 0;
+          entityStatus[entityType] = false;
+        }
+      }
+      
+      // Return dynamic context about ALL entity types
       return {
-        hasUsers: !users.includes("No users"),
-        userCount: users.includes("No users") ? 0 : (users.match(/- /g) || []).length,
+        availableEntities,
+        entityCounts,
+        entityStatus,
+        totalEntities: Object.values(entityCounts).reduce((sum, count) => sum + count, 0),
         availableOperations: ["create", "read", "update", "delete", "list"],
-        availableEntities: this.crudHandler.getAvailableEntityTypes()
+        // Keep backward compatibility
+        hasUsers: entityStatus.users || false,
+        userCount: entityCounts.users || 0
       };
     } catch (error) {
       console.error("Error getting DB context:", error);
+      // Fallback to minimal context
       return {
-        hasUsers: false,
-        userCount: 0,
+        availableEntities: this.crudHandler.getAvailableEntityTypes(),
+        entityCounts: {},
+        entityStatus: {},
+        totalEntities: 0,
         availableOperations: ["create", "read", "update", "delete", "list"],
-        availableEntities: ["users"]
+        hasUsers: false,
+        userCount: 0
       };
+    }
+  }
+  
+  /**
+   * Execute a database operation dynamically
+   */
+  private async executeOperation(operation: string, args: Record<string, unknown>): Promise<string> {
+    try {
+      // Parse operation path (e.g., "functions.users.listUsers")
+      const parts = operation.split('.');
+      let apiPath: unknown = api;
+      
+      for (const part of parts) {
+        apiPath = (apiPath as Record<string, unknown>)[part];
+        if (!apiPath) {
+          throw new Error(`Operation ${operation} not found in API`);
+        }
+      }
+      
+      // Execute as query (list operations are queries)
+      const result = await this.convex.query(apiPath as never, args as never);
+      return result as string;
+    } catch (error) {
+      throw new Error(`Failed to execute ${operation}: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }
 

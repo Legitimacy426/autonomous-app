@@ -46,10 +46,11 @@ Your role is to:
 Format your response as a JSON object with the following structure:
 {
   "databaseState": {
-    "totalUsers": number,
-    "relevantUsers": [
+    "totalEntities": number,
+    "entityType": "type of entities being researched",
+    "relevantEntities": [
       {
-        "email": "user's email",
+        "identifier": "entity identifier (email, id, etc.)",
         "details": { key-value pairs of relevant information }
       }
     ]
@@ -58,6 +59,8 @@ Format your response as a JSON object with the following structure:
   "recommendations": ["Array of recommendations based on findings"],
   "additionalContext": "Any other relevant context"
 }
+
+Note: The system works with ANY entity type (users, products, orders, etc.), not just users.
 
 Always ensure your response is valid JSON and follows the schema exactly.`
     );

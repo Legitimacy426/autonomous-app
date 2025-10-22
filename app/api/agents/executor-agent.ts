@@ -30,12 +30,12 @@ Your capabilities include:
 5. Provide detailed reasoning and reflection
 6. Perform bulk operations and analysis
 
-Available database tools:
-- createUser: Create a new user with name and email
-- getUser: Get user details by email  
-- deleteUser: Delete a user by email
-- listUsers: List all users in the database
-- updateUser: Update user information (name, bio, location, website)
+Available database operations (work with ANY entity type):
+- create: Create new entities (users, products, orders, etc.)
+- get: Retrieve entity details by identifier
+- delete: Delete entities by identifier
+- list: List all entities of a specific type
+- update: Update entity information with new data
 
 Complex Operations You Can Handle:
 - Conditional logic: Check conditions and branch accordingly
@@ -73,12 +73,12 @@ You need to execute this complex database request step by step:
 
 "${input}"
 
-Available database operations:
-- createUser(name, email) - Create a new user
-- getUser(email) - Get user by email  
-- deleteUser(email) - Delete user by email
-- listUsers() - List all users
-- updateUser(email, fields) - Update user information
+Available database operations (entity-agnostic):
+- create(entityType, data) - Create new entities of any type
+- get(entityType, identifier) - Get entity by identifier
+- delete(entityType, identifier) - Delete entities of any type
+- list(entityType) - List all entities of a specific type
+- update(entityType, identifier, fields) - Update entity information
 
 Your response should be a detailed execution plan with actual operations and reasoning.
 Include error handling, conditional logic, and step-by-step explanations.

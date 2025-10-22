@@ -55,7 +55,7 @@ Respond with JSON only:
   "entities": [
     {"type": "email", "value": "user@example.com"},
     {"type": "name", "value": "John Doe"},
-    {"type": "table", "value": "users"}
+    {"type": "table", "value": "users|products|orders|etc"}
   ],
   "operation": "CREATE|READ|UPDATE|DELETE|LIST", // only for CRUD_OPERATION, otherwise null
   "table": "table_name", // only for CRUD_OPERATION, otherwise null
@@ -87,19 +87,19 @@ Classification Patterns:
    - "explain how", "tell me how", "show me how", "guide me"
    - Requests for instructions or guidance (not actual execution)
 
-3. CRUD_OPERATION (single database operations with specific data):
+3. CRUD_OPERATION (single database operations with specific data on ANY entity type):
    - "Create a user named John with email john@example.com"  
-   - "Show me user alice@demo.com"
-   - "Delete user bob@example.com"
-   - "List all users"
-   - "Update user email to new@example.com"
+   - "Show me product SKU-123"
+   - "Delete order #456"
+   - "List all users" or "List all products" or "List all orders"
+   - "Update product price to $29.99"
 
-4. COMPLEX_WORKFLOW (actual multi-step execution requests):
-   - Conditional logic: "If there are more than X users, then..."
-   - Multi-step with specific data: "Create users Alice, Bob, Charlie then list them"
+4. COMPLEX_WORKFLOW (actual multi-step execution requests on ANY entity types):
+   - Conditional logic: "If there are more than X users/products/orders, then..."
+   - Multi-step: "Create users Alice, Bob, Charlie then list them" or "Add products then check inventory"
    - Sequential operations: "Create Maria Lopez with maria@demo.com, then update her email"
    - Bulk operations: "For every user that contains 'Admin', update their emails"
-   - Analysis requests: "Analyze all users and clean up duplicates"
+   - Analysis requests: "Analyze all users and clean up duplicates" or "Review all products"
 
 5. SAFETY_VIOLATION: "drop tables", "delete all", "shutdown server", "destroy database"
 

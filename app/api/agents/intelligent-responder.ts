@@ -21,11 +21,12 @@ CRITICAL PRINCIPLES:
 5. You think critically and reason about what the user actually needs
 
 CAPABILITIES YOU HAVE:
-- Database operations: create, read, update, delete users
-- Multi-step workflows and complex operations
+- Database operations: create, read, update, delete ANY entity type (users, products, orders, etc.)
+- Multi-step workflows and complex operations across multiple entities
 - Conditional logic and reasoning
 - Data analysis and reflection
-- Context awareness of current database state
+- Context awareness of current database state for ALL entity types
+- Dynamic adaptation to available entity types
 
 RESPONSE STYLE:
 - Be natural, conversational, and helpful
@@ -60,24 +61,36 @@ Respond in a way that shows true intelligence and understanding, not pattern mat
       console.log("🧠 Generating intelligent response for:", input);
       reasoning.push("Analyzing user intent with AI reasoning");
       
+      // Format entity context dynamically
+      const entityInfo = dbContext.entityCounts ? 
+        Object.entries(dbContext.entityCounts as Record<string, number>)
+          .map(([entity, count]) => `${entity}: ${count} items`)
+          .join(", ") : "No entity data available";
+      
       const prompt = `
 User said: "${input}"
 
 Context Information:
 - Interaction type: ${context}
 - Classification confidence: ${classification.confidence}
-- Current database has ${dbContext.userCount} users
+- Database State: ${entityInfo}
+- Total entities in database: ${dbContext.totalEntities || 0}
+- Available entity types: ${JSON.stringify(dbContext.availableEntities)}
 - Available operations: ${JSON.stringify(dbContext.availableOperations)}
-- Available entities: ${JSON.stringify(dbContext.availableEntities)}
 
 Classification details: ${JSON.stringify(classification, null, 2)}
 
 YOUR TASK:
 Understand what the user REALLY wants and respond in a natural, human-like way.
 
+Key points:
+- You can work with ANY entity type, not just users
+- The database is dynamic - you can see what entity types are available
+- Adapt your response based on what actually exists in the database
+
 If they're greeting you: Respond warmly and offer help based on what they might need.
-If they're asking a question: Answer it thoughtfully, considering their actual intent.
-If they're unclear: Help them understand what you can do, but be conversational about it.
+If they're asking a question: Answer it thoughtfully, showing what's possible with the available entities.
+If they're unclear: Help them understand what you can do with the specific entity types available.
 If it's a safety concern: Explain why you can't help with that specific request, but offer safe alternatives.
 
 DO NOT use templates or patterns. Think about what a helpful human would say in this situation.
@@ -125,13 +138,21 @@ Respond with JSON:
     dbContext: Record<string, unknown>,
     reasoning: string[]
   ): Promise<{ message: string; reasoning: string[] }> {
+    // Format entity info for adaptive response
+    const entitySummary = dbContext.entityCounts ? 
+      Object.entries(dbContext.entityCounts as Record<string, number>)
+        .map(([entity, count]) => `${count} ${entity}`)
+        .join(", ") : "no data";
+    
     const adaptivePrompt = `
 User said: "${input}"
 Context: ${context}
-Database state: ${dbContext.userCount} users exist
+Database has: ${entitySummary}
+Available entity types: ${JSON.stringify(dbContext.availableEntities)}
 
 Generate a brief, helpful response that addresses their input naturally.
 Be conversational and focus on what they might actually need.
+Mention the available entity types if relevant.
 
 Respond with just the message text, no JSON.`;
 
@@ -141,8 +162,9 @@ Respond with just the message text, no JSON.`;
       return { message: message.trim(), reasoning };
     } catch {
       // Last resort: minimal but still contextual
+      const entityTypes = (dbContext.availableEntities as string[] || []).join(", ") || "entities";
       return {
-        message: `I understand you said "${input}". I can help you with database operations like creating, reading, updating, or deleting users. I can also handle complex multi-step workflows. What would you like to do?`,
+        message: `I understand you said "${input}". I can help you with database operations like creating, reading, updating, or deleting ${entityTypes}. I can also handle complex multi-step workflows. What would you like to do?`,
         reasoning: [...reasoning, "Used minimal contextual response"]
       };
     }

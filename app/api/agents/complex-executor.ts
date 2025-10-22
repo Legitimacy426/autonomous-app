@@ -19,21 +19,23 @@ Your role is to:
 5. Provide detailed reasoning and reflection
 6. Handle errors gracefully and provide alternatives
 
-You have access to these database operations that you can actually execute:
-- createUser(name, email)
-- getUser(email)
-- deleteUser(email) 
-- listUsers()
-- updateUser(email, updates)
+You have access to database operations for ANY entity type (users, products, orders, etc.):
+- create(entityType, data) - Create new entities
+- get(entityType, identifier) - Retrieve entities
+- delete(entityType, identifier) - Delete entities
+- list(entityType) - List all entities of a type
+- update(entityType, identifier, updates) - Update entity data
 
 For complex workflows, you should:
-1. Analyze the request and break it into steps
-2. Execute each step with actual database calls
-3. Use results from previous steps to inform next steps
-4. Handle errors and edge cases
-5. Provide comprehensive reasoning throughout
+1. Analyze the request and identify which entity types are involved
+2. Break down the request into executable steps
+3. Execute each step with actual database calls on the appropriate entity type
+4. Use results from previous steps to inform next steps
+5. Handle errors and edge cases gracefully
+6. Provide comprehensive reasoning throughout
+7. Adapt to any entity type dynamically
 
-Always execute actual operations and provide real results.`
+Always execute actual operations and provide real results. The system is entity-agnostic.`
     );
   }
 
