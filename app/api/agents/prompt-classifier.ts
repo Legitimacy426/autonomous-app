@@ -81,33 +81,36 @@ Classification Patterns:
 
 1. GREETING: "hello", "hi", "hey", "good morning"
 
-2. SIMPLE_QUESTION: "what is...", "how do...", "what can you do", "help me understand"
+2. SIMPLE_QUESTION: 
+   - "what is...", "how do...", "what can you do", "help me understand"
+   - "how do I start", "how to create", "what's the process", "how should I"
+   - "explain how", "tell me how", "show me how", "guide me"
+   - Requests for instructions or guidance (not actual execution)
 
-3. CRUD_OPERATION (single database operations):
-   - "Create a user named John"  
+3. CRUD_OPERATION (single database operations with specific data):
+   - "Create a user named John with email john@example.com"  
    - "Show me user alice@demo.com"
    - "Delete user bob@example.com"
    - "List all users"
-   - "Update user email"
+   - "Update user email to new@example.com"
 
-4. COMPLEX_WORKFLOW (requires multi-agent planning):
+4. COMPLEX_WORKFLOW (actual multi-step execution requests):
    - Conditional logic: "If there are more than X users, then..."
-   - Multi-step: "Create 3 users then list them"
-   - Sequential with context: "Create user, then update their email"
-   - Bulk operations: "For every user that contains 'Admin'..."
+   - Multi-step with specific data: "Create users Alice, Bob, Charlie then list them"
+   - Sequential operations: "Create Maria Lopez with maria@demo.com, then update her email"
+   - Bulk operations: "For every user that contains 'Admin', update their emails"
    - Analysis requests: "Analyze all users and clean up duplicates"
-   - Reasoning requests: "...then explain which function was called and why"
 
 5. SAFETY_VIOLATION: "drop tables", "delete all", "shutdown server", "destroy database"
 
 6. UNKNOWN: Unclear, ambiguous, or unrelated requests
 
 Key Decision Factors:
-- Single operation = CRUD_OPERATION
-- Multiple operations OR conditional logic OR "if/then" statements = COMPLEX_WORKFLOW  
-- Requests for explanation/reasoning = COMPLEX_WORKFLOW
-- Bulk operations on multiple records = COMPLEX_WORKFLOW
-- Analysis or cleanup requests = COMPLEX_WORKFLOW
+- Asking "how to" or "how do I" = SIMPLE_QUESTION (instruction request)
+- Single operation with specific data = CRUD_OPERATION
+- Multiple operations with specific data = COMPLEX_WORKFLOW  
+- Asking for guidance/instructions = SIMPLE_QUESTION
+- Requesting actual execution = CRUD_OPERATION or COMPLEX_WORKFLOW
 
 Respond with classification JSON only.`;
 
