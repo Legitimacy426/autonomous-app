@@ -498,4 +498,46 @@ Return empty object {} if no additional data found.`;
   getEntityConfig(entityType: string): EntityConfig | undefined {
     return this.entityConfigs.get(entityType);
   }
+
+  /**
+   * Get schema information for all configured entities
+   * Used by AI for better understanding of available data structures
+   */
+  getSchemaInfo(): Record<string, { fields: Record<string, { type: string; required: boolean }>; identifierField: string }> {
+    const schemaInfo: Record<string, { fields: Record<string, { type: string; required: boolean }>; identifierField: string }> = {};
+    
+    for (const [entityType, config] of this.entityConfigs.entries()) {
+      schemaInfo[entityType] = {
+        fields: Object.fromEntries(
+          Object.entries(config.fields).map(([field, fieldConfig]) => [
+            field,
+            { type: fieldConfig.type, required: fieldConfig.required }
+          ])
+        ),
+        identifierField: config.identifierField
+      };
+    }
+    
+    return schemaInfo;
+  }
+
+  /**
+   * Get human-readable schema description
+   */
+  getSchemaDescription(): string {
+    const schemas: string[] = [];
+    
+    for (const [entityType, config] of this.entityConfigs.entries()) {
+      const fields = Object.entries(config.fields)
+        .map(([field, fieldConfig]) => {
+          const req = fieldConfig.required ? "required" : "optional";
+          return `  - ${field}: ${fieldConfig.type} (${req})`;
+        })
+        .join("\n");
+      
+      schemas.push(`${entityType}:\n${fields}\n  identifier: ${config.identifierField}`);
+    }
+    
+    return schemas.join("\n\n");
+  }
 }

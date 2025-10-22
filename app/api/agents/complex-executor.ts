@@ -135,6 +135,7 @@ IMPORTANT: Respond with ONLY valid JSON. No markdown, no explanations - just JSO
    */
   private async createExecutionPlan(input: string): Promise<ExecutionPlan> {
     const availableEntities = this.dynamicCrudHandler.getAvailableEntityTypes();
+    const schemaDescription = this.dynamicCrudHandler.getSchemaDescription();
     
     const planningPrompt = `
 Create an execution plan for this request:
@@ -142,40 +143,43 @@ Create an execution plan for this request:
 
 Available entity types: ${availableEntities.join(", ")}
 
+Entity schemas:
+${schemaDescription}
+
 Generate a plan with steps that:
 1. Use operations: list, create, read, update, delete
-2. Work with the entity types mentioned in the request
+2. Work with the entity types mentioned in the request (even if not in available list)
 3. Handle conditions using fromStep references
-4. Support sorting (sort: {by: "field", order: "asc"|"desc"})
+4. Support sorting (sort: {by: "field", order: "asc"|"desc"}) - use actual field names from schema
 5. Support limits (limit: number)
+6. Support filters (filter: {field: value}) - use actual field names from schema
+7. For cross-entity analysis: list each entity type separately, then use conditions to correlate
+8. When creating/updating entities, use the field names defined in the schema above
+9. Use the identifierField from schema for read/update/delete operations
+
+IMPORTANT: 
+- Reference schema fields accurately (e.g., users have: name, email, bio, location, website)
+- If the request mentions entity types not in the available list (like products, orders, purchases),
+  still create a plan using those entity types. The system will handle the "not configured" error gracefully.
+- For date filters, if the entity doesn't have a date field in schema, use _creationTime (Convex default)
 
 Respond with ONLY valid JSON matching this structure:
+
+Example 1 - Conditional logic:
 {
   "steps": [
-    {
-      "id": "step1",
-      "purpose": "Why this step",
-      "operation": "list",
-      "entityType": "users",
-      "sort": {"by": "_creationTime", "order": "asc"},
-      "limit": 1
-    },
-    {
-      "id": "step2",
-      "purpose": "Conditional action",
-      "operation": "delete",
-      "entityType": "users",
-      "condition": {"type": "count_gt", "fromStep": "step1", "field": "count", "value": 3},
-      "fromStep": "step1"
-    },
-    {
-      "id": "step3",
-      "purpose": "Alternative action",
-      "operation": "create",
-      "entityType": "users",
-      "condition": {"type": "count_lte", "fromStep": "step1", "field": "count", "value": 3},
-      "data": {"name": "TempUser", "email": "temp@demo.com"}
-    }
+    {"id": "step1", "operation": "list", "entityType": "users", "purpose": "Count users"},
+    {"id": "step2", "operation": "delete", "entityType": "users", "condition": {"type": "count_gt", "fromStep": "step1", "value": 3}, "fromStep": "step1", "limit": 1},
+    {"id": "step3", "operation": "create", "entityType": "users", "condition": {"type": "count_lte", "fromStep": "step1", "value": 3}, "data": {"name": "TempUser", "email": "temp@demo.com"}}
+  ]
+}
+
+Example 2 - Cross-entity analysis:
+{
+  "steps": [
+    {"id": "listUsers", "operation": "list", "entityType": "users", "filter": {"registeredDate": "2025-01-20"}, "purpose": "Get users registered on 20th"},
+    {"id": "listPurchases", "operation": "list", "entityType": "purchases", "filter": {"seller": "A"}, "purpose": "Get purchases from seller A"},
+    {"id": "correlate", "operation": "list", "entityType": "users", "condition": {"type": "exists", "fromStep": "listUsers"}, "purpose": "Count intersection (note: actual correlation logic may fail if entity not configured)"}
   ]
 }
 

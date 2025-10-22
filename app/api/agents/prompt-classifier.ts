@@ -86,13 +86,18 @@ Classification Patterns:
    - "how do I start", "how to create", "what's the process", "how should I"
    - "explain how", "tell me how", "show me how", "guide me"
    - Requests for instructions or guidance (not actual execution)
+   - Generic questions about concepts, NOT data queries
 
 3. CRUD_OPERATION (single database operations with specific data on ANY entity type):
    - "Create a user named John with email john@example.com"  
    - "Show me product SKU-123"
    - "Delete order #456"
    - "List all users" or "List all products" or "List all orders"
+   - "How many users are there" or "How many products do we have" or "Count users"
+   - "Show me all users" or "Get all products" or "Fetch orders"
+   - "What users exist" or "What products are in the database"
    - "Update product price to $29.99"
+   - ANY question asking for actual data from the database (use LIST operation)
 
 4. COMPLEX_WORKFLOW (actual multi-step execution requests on ANY entity types):
    - Conditional logic: "If there are more than X users/products/orders, then..."
@@ -100,6 +105,8 @@ Classification Patterns:
    - Sequential operations: "Create Maria Lopez with maria@demo.com, then update her email"
    - Bulk operations: "For every user that contains 'Admin', update their emails"
    - Analysis requests: "Analyze all users and clean up duplicates" or "Review all products"
+   - Cross-entity queries: "How many users registered on 20th bought from seller A" or "Show users who purchased product X"
+   - Filtering/joining: "Users where X" combined with "products/orders where Y"
 
 5. SAFETY_VIOLATION: "drop tables", "delete all", "shutdown server", "destroy database"
 
@@ -107,10 +114,14 @@ Classification Patterns:
 
 Key Decision Factors:
 - Asking "how to" or "how do I" = SIMPLE_QUESTION (instruction request)
+- Asking "how many", "what data", "show me", "list", "count" = CRUD_OPERATION (data query, use LIST)
 - Single operation with specific data = CRUD_OPERATION
 - Multiple operations with specific data = COMPLEX_WORKFLOW  
 - Asking for guidance/instructions = SIMPLE_QUESTION
+- Requesting actual data from database = CRUD_OPERATION (LIST)
 - Requesting actual execution = CRUD_OPERATION or COMPLEX_WORKFLOW
+
+IMPORTANT: "How many users" or "What users exist" requires querying the database = CRUD_OPERATION with LIST operation!
 
 Respond with classification JSON only.`;
 
