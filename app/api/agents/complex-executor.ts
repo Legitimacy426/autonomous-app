@@ -11,6 +11,8 @@ export class ComplexExecutor extends BaseAgent {
       convex,
       `You are an advanced executor that performs complex database operations with actual execution capabilities.
 
+CRITICAL: When asked to analyze requests, you MUST respond with ONLY valid JSON. No explanations, no markdown formatting, no additional text - just pure JSON.
+
 Your role is to:
 1. Break down complex requests into executable steps
 2. Actually execute database operations in sequence
@@ -95,16 +97,52 @@ Determine:
 3. In what order they should be executed
 4. Any conditional logic or branching needed
 
-Return JSON with:
+IMPORTANT: You MUST respond with ONLY valid JSON, nothing else. No explanations, no markdown, just pure JSON.
+
+Return this exact JSON structure:
 {
   "type": "workflow type",
   "steps": ["step 1", "step 2", "step 3"],
   "summary": "brief summary of what will be done"
 }`;
 
-    const response = await this.execute(analysisPrompt);
-    const cleaned = response.replace(/```json\n?|\n?```/g, '').trim();
-    return JSON.parse(cleaned);
+    try {
+      const response = await this.execute(analysisPrompt);
+      
+      // Try to extract JSON from response (handles markdown code blocks, etc.)
+      let cleaned = response.trim();
+      
+      // Remove markdown code blocks if present
+      cleaned = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      // Try to find JSON object in the response
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleaned = jsonMatch[0];
+      }
+      
+      const parsed = JSON.parse(cleaned);
+      
+      // Validate the structure
+      if (!parsed.type || !parsed.steps || !parsed.summary) {
+        throw new Error("Invalid analysis structure");
+      }
+      
+      return parsed;
+    } catch (error) {
+      console.error("Failed to parse analysis JSON:", error);
+      
+      // Fallback: Create a simple analysis based on the input
+      return {
+        type: "conditional",
+        steps: [
+          "Analyze the conditional logic",
+          "Execute database operations based on conditions",
+          "Return results"
+        ],
+        summary: "Executing conditional workflow with fallback analysis"
+      };
+    }
   }
 
   /**
