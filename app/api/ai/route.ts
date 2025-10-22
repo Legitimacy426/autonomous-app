@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
-import { AgentCoordinator } from "../agents/coordinator";
+import { SmartCoordinator } from "../agents/smart-coordinator";
 import { ConvexMemory } from "../memory/convex-memory";
 import { v4 as uuidv4 } from "uuid";
 
@@ -35,8 +35,8 @@ class AILogger {
 
 const logger = new AILogger("AI Agent");
 
-// Initialize agent coordinator
-const coordinator = new AgentCoordinator(convex);
+// Initialize smart coordinator
+const coordinator = new SmartCoordinator(convex);
 
 /**
  * POST /api/ai
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     // Initialize memory
     const memory = new ConvexMemory(convex, sessionId);
 
-    // Process task through multi-agent workflow
+    // Process task through smart coordinator
     const result = await coordinator.processTask(text);
     
     // Save interaction to memory
@@ -85,7 +85,8 @@ export async function POST(req: NextRequest) {
     const response = {
       success: result.success,
       result: coordinator.formatResults(result),
-      reasoning: [],
+      reasoning: result.reasoning,
+      strategy: result.strategy,
     };
 
     return NextResponse.json(response);

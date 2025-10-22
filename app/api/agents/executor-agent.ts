@@ -85,7 +85,7 @@ For the request: ${input}`
         }
         reasoning.push(`Planning to execute: ${plan.action}`);
         console.log("✅ Successfully parsed action plan:", plan);
-      } catch (_error) {
+      } catch {
         console.log("❌ Failed to parse action plan");
         throw new Error("Failed to parse action plan: Invalid JSON response");
       }
