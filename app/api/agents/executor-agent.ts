@@ -54,8 +54,13 @@ Always ensure your response is valid JSON and follows the schema exactly.`
     let result = "";
 
     try {
+      console.log("🔄 Processing input:", input);
+      console.log("📝 Starting workflow...");
+
       // First, analyze the input to determine the required action
       reasoning.push("Analyzing input to determine required action");
+      console.log("🤔 Analyzing input to determine required action...");
+      console.log("🎯 Requesting action plan from LLM...");
       const actionPlan = await this.execute(
         `Analyze the following request and determine the appropriate database action. Return ONLY a JSON object with an 'action' property set to one of: 'create', 'get', 'delete', 'list', or 'update'.
 
@@ -70,28 +75,36 @@ For the request: ${input}`
       // Parse the action plan, handling potential JSON formatting issues
       let plan;
       try {
+        console.log("📥 Received action plan:", actionPlan);
         // Remove any markdown formatting or extra text, keeping only the JSON object
         const jsonStr = actionPlan.replace(/```json\n|\n```/g, '').trim();
+        console.log("🔍 Cleaned JSON string:", jsonStr);
         plan = JSON.parse(jsonStr);
         if (!plan.action) {
           throw new Error("Invalid action plan format");
         }
         reasoning.push(`Planning to execute: ${plan.action}`);
+        console.log("✅ Successfully parsed action plan:", plan);
       } catch (_error) {
+        console.log("❌ Failed to parse action plan");
         throw new Error("Failed to parse action plan: Invalid JSON response");
       }
 
       // Execute the appropriate database operation
+      console.log("⚡ Executing operation:", plan.action);
       const executionResult = await this.executeOperation(plan, input);
+      console.log("📊 Operation result:", executionResult);
       
       // Format the result
       result = this.formatResult(executionResult);
 
       // Log the successful execution
       await this.logAction(input, reasoning, result);
+      console.log("✨ Workflow completed successfully");
 
       return { result, reasoning };
     } catch (error) {
+      console.log("❌ Workflow failed:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       reasoning.push(`Error during execution: ${errorMessage}`);
       result = `Failed to execute operation: ${errorMessage}`;
@@ -114,6 +127,7 @@ For the request: ${input}`
     const emails = originalInput.match(emailRegex) || [];
 
     try {
+      console.log("🔄 Starting operation execution...");
       switch (plan.action.toLowerCase()) {
         case "create":
           // Extract name and email from the input
@@ -130,10 +144,12 @@ For the request: ${input}`
             };
           }
 
+          console.log("👤 Creating user:", { name, email });
           const createResult = await this.convex.mutation(api.functions.users.createUser, {
             name,
             email,
           });
+          console.log("📝 Create result:", createResult);
 
           return {
             success: !createResult.includes("❌"),
@@ -151,9 +167,11 @@ For the request: ${input}`
             };
           }
 
+          console.log("🔍 Getting user:", emails[0]);
           const getResult = await this.convex.query(api.functions.users.getUser, {
             email: emails[0],
           });
+          console.log("📝 Get result:", getResult);
 
           return {
             success: !getResult.includes("❌"),
@@ -171,9 +189,11 @@ For the request: ${input}`
             };
           }
 
+          console.log("🗑️ Deleting user:", emails[0]);
           const deleteResult = await this.convex.mutation(api.functions.users.deleteUser, {
             email: emails[0],
           });
+          console.log("📝 Delete result:", deleteResult);
 
           return {
             success: !deleteResult.includes("❌"),
@@ -182,7 +202,9 @@ For the request: ${input}`
           };
 
         case "list":
+          console.log("📋 Listing all users...");
           const listResult = await this.convex.query(api.functions.users.listUsers, {});
+          console.log("📝 List result:", listResult);
 
           return {
             success: true,
@@ -229,7 +251,9 @@ For the request: ${input}`
             updates.website = websiteMatch[1];
           }
 
+          console.log("✏️ Updating user:", updates);
           const updateResult = await this.convex.mutation(api.functions.users.updateUser, updates);
+          console.log("📝 Update result:", updateResult);
 
           return {
             success: !updateResult.includes("❌"),
