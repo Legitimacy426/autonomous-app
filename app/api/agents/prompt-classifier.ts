@@ -17,8 +17,8 @@ const ClassificationResult = z.object({
     type: z.string(),
     value: z.string()
   })),
-  operation: z.optional(z.enum(["CREATE", "READ", "UPDATE", "DELETE", "LIST"])),
-  table: z.optional(z.string()),
+  operation: z.optional(z.enum(["CREATE", "READ", "UPDATE", "DELETE", "LIST"])).nullable(),
+  table: z.optional(z.string()).nullable(),
   requiresMultiAgent: z.boolean(),
   reasoning: z.string()
 });
@@ -57,11 +57,13 @@ Respond with JSON only:
     {"type": "name", "value": "John Doe"},
     {"type": "table", "value": "users"}
   ],
-  "operation": "CREATE|READ|UPDATE|DELETE|LIST", // if applicable
-  "table": "table_name", // if applicable  
+  "operation": "CREATE|READ|UPDATE|DELETE|LIST", // only for CRUD_OPERATION, otherwise null
+  "table": "table_name", // only for CRUD_OPERATION, otherwise null
   "requiresMultiAgent": boolean,
   "reasoning": "Brief explanation of classification"
-}`
+}
+
+IMPORTANT: Set operation and table to null for GREETING, SIMPLE_QUESTION, SAFETY_VIOLATION, and UNKNOWN intents.`
     );
   }
 
