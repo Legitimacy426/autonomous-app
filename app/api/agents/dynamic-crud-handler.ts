@@ -86,6 +86,8 @@ Always validate data before operations and provide detailed feedback.`
     });
 
     // Example: Products configuration (for extensibility)
+    // Uncomment when you create the products Convex functions
+    /*
     this.entityConfigs.set("products", {
       table: "products",
       operations: {
@@ -103,6 +105,12 @@ Always validate data before operations and provide detailed feedback.`
       },
       identifierField: "name"
     });
+    */
+    
+    // To add a new entity type:
+    // 1. Create Convex functions (convex/functions/entityType.ts)
+    // 2. Add configuration here using this.entityConfigs.set()
+    // 3. The system will automatically discover and use it!
   }
 
   /**

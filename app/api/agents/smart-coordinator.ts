@@ -274,9 +274,10 @@ export class SmartCoordinator {
             entityCounts[entityType] = count;
             entityStatus[entityType] = count > 0;
           }
-        } catch (error) {
-          // If we can't get count for this entity, just skip it
-          console.warn(`Could not get count for ${entityType}:`, error);
+        } catch {
+          // If we can't get count for this entity, just skip it silently
+          // This happens when entity is configured but Convex function doesn't exist
+          console.debug(`Skipping ${entityType} (function not available)`);
           entityCounts[entityType] = 0;
           entityStatus[entityType] = false;
         }
@@ -320,7 +321,8 @@ export class SmartCoordinator {
       for (const part of parts) {
         apiPath = (apiPath as Record<string, unknown>)[part];
         if (!apiPath) {
-          throw new Error(`Operation ${operation} not found in API`);
+          // Function not found in API - this is expected when entity is configured but function doesn't exist
+          throw new Error(`Function ${operation} not found in generated API`);
         }
       }
       
@@ -328,7 +330,12 @@ export class SmartCoordinator {
       const result = await this.convex.query(apiPath as never, args as never);
       return result as string;
     } catch (error) {
-      throw new Error(`Failed to execute ${operation}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      // Don't log full stack trace for missing functions - it's expected
+      const message = error instanceof Error ? error.message : "Unknown error";
+      if (message.includes("not found") || message.includes("Did you forget")) {
+        throw new Error(`Function not available: ${operation}`);
+      }
+      throw new Error(`Failed to execute ${operation}: ${message}`);
     }
   }
 
